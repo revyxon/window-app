@@ -4,8 +4,10 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import '../providers/app_provider.dart';
 import '../utils/app_colors.dart';
 import '../widgets/enquiry_card.dart';
+import 'enquiry_detail_screen.dart';
 import '../services/activity_log_service.dart';
 import '../models/activity_log.dart';
+import '../utils/fast_page_route.dart';
 
 class EnquiryListScreen extends StatefulWidget {
   const EnquiryListScreen({super.key});
@@ -24,12 +26,7 @@ class _EnquiryListScreenState extends State<EnquiryListScreen> {
   @override
   void initState() {
     super.initState();
-    ActivityLogService().logScreenView(
-      ScreenNames.home,
-    ); // Reusing home or add new constant?
-    // Let's assume we might want a new screen name constant later, but 'EnquiryList' isn't in ActivityLogService yet.
-    // For now, let's just log it as a generic page view or skip it if strict.
-    // We'll skip logging specifically or use a custom string.
+    ActivityLogService().logScreenView(ScreenNames.home); // Using home for now
 
     Future.microtask(
       () => Provider.of<AppProvider>(context, listen: false).loadEnquiries(),
@@ -201,7 +198,12 @@ class _EnquiryListScreenState extends State<EnquiryListScreen> {
                       return EnquiryCard(
                         enquiry: enquiry,
                         onTap: () {
-                          // TODO: Navigate to detail/edit screen
+                          Navigator.push(
+                            context,
+                            FastPageRoute(
+                              page: EnquiryDetailScreen(enquiry: enquiry),
+                            ),
+                          );
                         },
                       );
                     }, childCount: enquiries.length),

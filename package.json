@@ -1,0 +1,13 @@
+{
+    "name": "window-project-monorepo",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Monorepo for Window Measurement Project",
+    "scripts": {
+        "release": "node scripts/publish_release.mjs",
+        "setup:repo": "node scripts/setup_repo.mjs"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}

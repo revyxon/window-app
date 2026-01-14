@@ -1,4 +1,6 @@
-// import fetch from 'node-fetch'; // Using built-in fetch
+// Script to help set up the repository if it doesn't exist
+// usage: node scripts/setup_repo.mjs
+
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const REPO_NAME = 'window-measurement-app';
