@@ -1,0 +1,50 @@
+# General
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+.pub-cache/
+.pub/
+
+# Android
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/**/*.gradle
+!android/build.gradle
+!android/app/build.gradle
+!android/settings.gradle
+!android/gradle.properties
+# keystores
+*.jks
+*.keystore
+key.properties
+
+# iOS
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Node / Web
+node_modules/
+npm-debug.log
+yarn-error.log
+.next/
+.vercel/
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+firebase-debug.log
+google-services.json
+GoogleService-Info.plist
+
+# Project specific
+publish.mjs
+test_storage.mjs
