@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+// import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/enquiry.dart';
@@ -8,6 +8,7 @@ import '../providers/app_provider.dart';
 import '../utils/app_colors.dart';
 import '../utils/haptics.dart';
 import '../widgets/glass_container.dart';
+import '../widgets/premium_toast.dart';
 
 class EnquiryDetailScreen extends StatefulWidget {
   final Enquiry enquiry;
@@ -26,6 +27,91 @@ class _EnquiryDetailScreenState extends State<EnquiryDetailScreen> {
   void initState() {
     super.initState();
     _currentStatus = widget.enquiry.status;
+  }
+
+  Future<void> _setReminder() async {
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: widget.enquiry.reminderDate ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            colorScheme: const ColorScheme.light(primary: AppColors.primary),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedDate != null && mounted) {
+      final TimeOfDay? pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(
+          widget.enquiry.reminderDate ??
+              DateTime.now().add(const Duration(hours: 1)),
+        ),
+        builder: (context, child) {
+          return Theme(
+            data: ThemeData.light().copyWith(
+              colorScheme: const ColorScheme.light(primary: AppColors.primary),
+              timePickerTheme: TimePickerThemeData(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+            child: child!,
+          );
+        },
+      );
+
+      if (pickedTime != null && mounted) {
+        final DateTime reminderDateTime = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+
+        setState(() => _isUpdating = true);
+        Haptics.medium();
+
+        try {
+          final updatedEnquiry = widget.enquiry.copyWith(
+            reminderDate: reminderDateTime,
+            updatedAt: DateTime.now(),
+            syncStatus: 2,
+          );
+
+          await Provider.of<AppProvider>(
+            context,
+            listen: false,
+          ).updateEnquiry(updatedEnquiry);
+
+          if (mounted) {
+            setState(() {
+              _isUpdating = false;
+            });
+            ToastService.show(
+              context,
+              'Reminder set for ${DateFormat('MMM d, h:mm a').format(reminderDateTime)}',
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() => _isUpdating = false);
+            ToastService.show(
+              context,
+              'Failed to set reminder: $e',
+              isError: true,
+            );
+          }
+        }
+      }
+    }
   }
 
   Future<void> _updateStatus(String newStatus) async {
@@ -51,20 +137,15 @@ class _EnquiryDetailScreenState extends State<EnquiryDetailScreen> {
           _currentStatus = newStatus;
           _isUpdating = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Status updated to ${newStatus.toUpperCase()}'),
-            backgroundColor: AppColors.success,
-            duration: const Duration(seconds: 1),
-          ),
+        ToastService.show(
+          context,
+          'Status updated to ${newStatus.toUpperCase()}',
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isUpdating = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to update: $e')));
+        ToastService.show(context, 'Failed to update: $e', isError: true);
       }
     }
   }
@@ -75,9 +156,7 @@ class _EnquiryDetailScreenState extends State<EnquiryDetailScreen> {
       await launchUrl(launchUri);
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not launch dialer')),
-        );
+        ToastService.show(context, 'Could not launch dialer', isError: true);
       }
     }
   }
@@ -115,22 +194,20 @@ class _EnquiryDetailScreenState extends State<EnquiryDetailScreen> {
           ).deleteEnquiry(widget.enquiry.id!);
           if (mounted) {
             Navigator.pop(context); // Go back to list
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Enquiry deleted')));
+            ToastService.show(context, 'Enquiry deleted');
           }
         } else {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Error: Invalid Enquiry ID')),
+            ToastService.show(
+              context,
+              'Error: Invalid Enquiry ID',
+              isError: true,
             );
           }
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Failed to delete: $e')));
+          ToastService.show(context, 'Failed to delete: $e', isError: true);
         }
       }
     }
@@ -167,7 +244,7 @@ class _EnquiryDetailScreenState extends State<EnquiryDetailScreen> {
         iconTheme: const IconThemeData(color: Colors.black),
         actions: [
           IconButton(
-            icon: const Icon(FluentIcons.delete_24_regular, color: Colors.red),
+            icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
             onPressed: _deleteEnquiry,
             tooltip: 'Delete Enquiry',
           ),
@@ -222,10 +299,50 @@ class _EnquiryDetailScreenState extends State<EnquiryDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: _isUpdating ? null : _setReminder,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            widget.enquiry.reminderDate != null
+                                ? Icons.notifications_active_outlined
+                                : Icons.notifications_none_outlined,
+                            size: 16,
+                            color: Colors.blue,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            widget.enquiry.reminderDate != null
+                                ? DateFormat(
+                                    'MMM d, h:mm a',
+                                  ).format(widget.enquiry.reminderDate!)
+                                : 'Set Reminder',
+                            style: const TextStyle(
+                              color: Colors.blue,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Icon(
-                        FluentIcons.clock_24_regular,
+                        Icons.access_time_rounded,
                         size: 16,
                         color: Colors.grey.shade600,
                       ),
@@ -252,7 +369,7 @@ class _EnquiryDetailScreenState extends State<EnquiryDetailScreen> {
                 height: 50,
                 child: ElevatedButton.icon(
                   onPressed: () => _makePhoneCall(widget.enquiry.phone!),
-                  icon: const Icon(FluentIcons.call_24_filled),
+                  icon: const Icon(Icons.call_rounded),
                   label: Text('Call ${widget.enquiry.phone}'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
@@ -270,25 +387,25 @@ class _EnquiryDetailScreenState extends State<EnquiryDetailScreen> {
             _buildSectionTitle('Details'),
             const SizedBox(height: 12),
             _buildDetailRow(
-              FluentIcons.location_24_regular,
+              Icons.location_on_outlined,
               'Location',
               widget.enquiry.location ?? 'N/A',
             ),
             if (widget.enquiry.requirements != null)
               _buildDetailRow(
-                FluentIcons.clipboard_letter_24_regular,
+                Icons.assignment_outlined,
                 'Requirements',
                 widget.enquiry.requirements!,
               ),
             if (widget.enquiry.expectedWindows != null)
               _buildDetailRow(
-                FluentIcons.table_24_regular,
+                Icons.grid_view_rounded,
                 'Expected Windows',
                 widget.enquiry.expectedWindows!,
               ),
             if (widget.enquiry.notes != null)
               _buildDetailRow(
-                FluentIcons.note_24_regular,
+                Icons.note_alt_outlined,
                 'Notes',
                 widget.enquiry.notes!,
               ),

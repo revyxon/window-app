@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+// import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import '../models/customer.dart';
 import '../providers/app_provider.dart';
 import '../utils/fast_page_route.dart';
+import '../widgets/premium_toast.dart';
 import 'window_input_screen.dart';
 
 class AddCustomerScreen extends StatefulWidget {
@@ -97,7 +98,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
               ),
               decoration: _buildInputDecoration(
                 'Customer Name *',
-                FluentIcons.person_24_regular,
+                Icons.person_outline_rounded,
               ),
               validator: (value) =>
                   value == null || value.isEmpty ? 'Please enter name' : null,
@@ -118,7 +119,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
               ),
               decoration: _buildInputDecoration(
                 'Location *',
-                FluentIcons.location_24_regular,
+                Icons.location_on_outlined,
               ),
               validator: (value) => value == null || value.isEmpty
                   ? 'Please enter location'
@@ -141,7 +142,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
               ),
               decoration: _buildInputDecoration(
                 'Phone (Optional)',
-                FluentIcons.call_24_regular,
+                Icons.phone_outlined,
               ),
             ),
             const SizedBox(height: 24),
@@ -180,7 +181,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
               ),
               decoration: _buildInputDecoration(
                 'Glass Type (Optional)',
-                FluentIcons.layer_24_regular,
+                Icons.layers_outlined,
               ),
               // Add 'Other' option
               items: [..._glassTypes, 'Other'].map((type) {
@@ -203,7 +204,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                   ),
                   decoration: _buildInputDecoration(
                     'Enter Custom Glass Type',
-                    FluentIcons.edit_24_regular,
+                    Icons.edit_outlined,
                   ),
                 ),
               ),
@@ -223,7 +224,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
               ),
               decoration: _buildInputDecoration(
                 'Rate per Sq.Ft (Optional)',
-                FluentIcons.currency_dollar_rupee_24_regular,
+                Icons.currency_rupee_rounded,
               ),
             ),
             const SizedBox(height: 24),
@@ -436,9 +437,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
           FastPageRoute(page: WindowInputScreen(customer: savedCustomer)),
         );
       } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error saving customer: $e')));
+        ToastService.show(context, 'Error saving customer: $e', isError: true);
       }
     }
   }

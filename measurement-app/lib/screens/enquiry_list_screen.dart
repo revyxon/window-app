@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+// import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import '../providers/app_provider.dart';
 import '../utils/app_colors.dart';
 import '../widgets/enquiry_card.dart';
@@ -101,13 +101,19 @@ class _EnquiryListScreenState extends State<EnquiryListScreen> {
                 backgroundColor: Colors.white,
                 surfaceTintColor: Colors.transparent,
                 toolbarHeight: 60,
-                title: const Text(
-                  'Enquiries',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 24,
-                  ),
+                title: Row(
+                  children: [
+                    const Icon(Icons.assignment_outlined, color: Colors.black),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Enquiries',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 24,
+                      ),
+                    ),
+                  ],
                 ),
                 bottom: PreferredSize(
                   preferredSize: const Size.fromHeight(120),
@@ -130,7 +136,7 @@ class _EnquiryListScreenState extends State<EnquiryListScreen> {
                               hintText: 'Search enquiries...',
                               hintStyle: TextStyle(color: Colors.grey.shade500),
                               prefixIcon: Icon(
-                                FluentIcons.search_24_regular,
+                                Icons.search_rounded,
                                 color: Colors.grey.shade500,
                               ),
                               border: InputBorder.none,
@@ -171,7 +177,7 @@ class _EnquiryListScreenState extends State<EnquiryListScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          FluentIcons.clipboard_letter_24_regular,
+                          Icons.assignment_outlined,
                           size: 48,
                           color: Colors.grey.shade300,
                         ),

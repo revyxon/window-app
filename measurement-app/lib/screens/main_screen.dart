@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+// import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:animations/animations.dart';
 import 'dart:math' as math;
 
@@ -128,33 +128,33 @@ class _MainScreenState extends State<MainScreen>
         indicatorColor: AppColors.primary.withOpacity(0.15),
         destinations: const [
           NavigationDestination(
-            icon: Icon(FluentIcons.square_multiple_24_regular),
+            icon: Icon(Icons.square_foot_outlined),
             selectedIcon: Icon(
-              FluentIcons.square_multiple_24_filled,
+              Icons.square_foot_rounded,
               color: AppColors.primary,
             ),
-            label: 'Home',
+            label: 'Measurement',
           ),
           NavigationDestination(
-            icon: Icon(FluentIcons.clipboard_letter_24_regular),
+            icon: Icon(Icons.assignment_outlined),
             selectedIcon: Icon(
-              FluentIcons.clipboard_letter_24_filled,
+              Icons.assignment_rounded,
               color: AppColors.primary,
             ),
             label: 'Enquiry',
           ),
           NavigationDestination(
-            icon: Icon(FluentIcons.briefcase_24_regular),
+            icon: Icon(Icons.handshake_outlined),
             selectedIcon: Icon(
-              FluentIcons.briefcase_24_filled,
+              Icons.handshake_rounded,
               color: AppColors.primary,
             ),
             label: 'Agreement',
           ),
           NavigationDestination(
-            icon: Icon(FluentIcons.settings_24_regular),
+            icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(
-              FluentIcons.settings_24_filled,
+              Icons.settings_rounded,
               color: AppColors.primary,
             ),
             label: 'Settings',
@@ -206,10 +206,7 @@ class _MainScreenState extends State<MainScreen>
                   heroTag: 'create_enquiry',
                   onPressed: _navigateToCreateEnquiry,
                   backgroundColor: AppColors.primary,
-                  child: const Icon(
-                    FluentIcons.clipboard_letter_24_regular,
-                    color: Colors.white,
-                  ),
+                  child: const Icon(Icons.assignment_add, color: Colors.white),
                 ),
               ],
             ),
@@ -251,10 +248,7 @@ class _MainScreenState extends State<MainScreen>
                   heroTag: 'create_measurement',
                   onPressed: _navigateToCreateMeasurement,
                   backgroundColor: AppColors.primary,
-                  child: const Icon(
-                    FluentIcons.add_square_24_regular,
-                    color: Colors.white,
-                  ),
+                  child: const Icon(Icons.add_box_rounded, color: Colors.white),
                 ),
               ],
             ),
@@ -272,8 +266,8 @@ class _MainScreenState extends State<MainScreen>
               return Transform.rotate(
                 angle: _fabAnimation.value * math.pi * 0.75, // Rotate to X
                 child: Icon(
-                  Icons.add,
-                  size: 28,
+                  Icons.add_rounded,
+                  size: 32,
                   color: _isFabExpanded ? AppColors.primary : Colors.white,
                 ),
               );

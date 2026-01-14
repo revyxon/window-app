@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+// import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import '../models/enquiry.dart';
 import '../providers/app_provider.dart';
+import '../widgets/premium_toast.dart';
 
 class CreateEnquiryScreen extends StatefulWidget {
   const CreateEnquiryScreen({super.key});
@@ -90,7 +91,7 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               ),
               decoration: _buildInputDecoration(
                 'Customer Name *',
-                FluentIcons.person_24_regular,
+                Icons.person_outline_rounded,
               ),
               validator: (value) =>
                   value == null || value.isEmpty ? 'Please enter name' : null,
@@ -112,7 +113,7 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               ),
               decoration: _buildInputDecoration(
                 'Phone (Optional)',
-                FluentIcons.call_24_regular,
+                Icons.phone_outlined,
               ),
             ),
             const SizedBox(height: 16),
@@ -131,7 +132,7 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               ),
               decoration: _buildInputDecoration(
                 'Location / Area *',
-                FluentIcons.location_24_regular,
+                Icons.location_on_outlined,
               ),
               validator: (value) => value == null || value.isEmpty
                   ? 'Please enter location'
@@ -155,7 +156,7 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               ),
               decoration: _buildInputDecoration(
                 'Requirements (e.g. 5 Windows, 2 Doors)',
-                FluentIcons.clipboard_letter_24_regular,
+                Icons.assignment_outlined,
               ),
             ),
             const SizedBox(height: 16),
@@ -174,7 +175,7 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               ),
               decoration: _buildInputDecoration(
                 'Expected Windows (Optional)',
-                FluentIcons.table_24_regular,
+                Icons.grid_view_rounded,
               ),
             ),
             const SizedBox(height: 16),
@@ -193,7 +194,7 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               ),
               decoration: _buildInputDecoration(
                 'Optional Notes',
-                FluentIcons.note_24_regular,
+                Icons.note_alt_outlined,
               ),
             ),
             const SizedBox(height: 40),
@@ -315,19 +316,11 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
         ).addEnquiry(enquiry);
         if (!mounted) return;
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✓ Enquiry created successfully!'),
-            backgroundColor: Color(0xFF10B981),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        ToastService.show(context, 'Enquiry created successfully!');
       } catch (e) {
         if (!mounted) return;
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error creating enquiry: $e')));
+        ToastService.show(context, 'Error creating enquiry: $e', isError: true);
       }
     }
   }

@@ -47,13 +47,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
 
-        title: const Text(
-          'Settings',
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-          ),
+        title: Row(
+          children: [
+            const Icon(Icons.settings_outlined, color: Colors.black),
+            const SizedBox(width: 12),
+            const Text(
+              'Settings',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
         centerTitle: false,
       ),

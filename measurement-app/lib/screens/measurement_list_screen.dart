@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import '../providers/app_provider.dart';
 import '../providers/settings_provider.dart';
 
@@ -13,6 +12,7 @@ import 'settings_screen.dart';
 import '../services/sync_service.dart';
 import '../services/activity_log_service.dart';
 import '../models/activity_log.dart';
+import '../widgets/premium_toast.dart';
 
 class MeasurementListScreen extends StatefulWidget {
   const MeasurementListScreen({super.key});
@@ -55,32 +55,14 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
       final error = await SyncService().syncData();
       if (mounted) {
         if (error == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✓ Synced successfully!'),
-              duration: Duration(seconds: 2),
-              backgroundColor: Color(0xFF10B981),
-            ),
-          );
+          ToastService.show(context, 'Synced successfully!');
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Sync error: $error'),
-              duration: const Duration(seconds: 4),
-              backgroundColor: Colors.red,
-            ),
-          );
+          ToastService.show(context, 'Sync error: $error', isError: true);
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sync failed: $e'),
-            duration: const Duration(seconds: 4),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ToastService.show(context, 'Sync failed: $e', isError: true);
       }
     } finally {
       if (mounted) setState(() => _isSyncing = false);
@@ -108,13 +90,19 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                 backgroundColor: Colors.white,
                 surfaceTintColor: Colors.transparent,
                 toolbarHeight: 60,
-                title: const Text(
-                  'Measurements',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 24,
-                  ),
+                title: Row(
+                  children: [
+                    const Icon(Icons.straighten_outlined, color: Colors.black),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Measurements',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 24,
+                      ),
+                    ),
+                  ],
                 ),
                 actions: [
                   // Manual Sync Button (Cloud icon)
@@ -129,7 +117,7 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                             ),
                           )
                         : const Icon(
-                            FluentIcons.cloud_sync_24_regular,
+                            Icons.cloud_sync_outlined,
                             color: Colors.black,
                           ),
                     onPressed: _triggerManualSync,
@@ -140,8 +128,8 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                     builder: (context, settings, _) => IconButton(
                       icon: Icon(
                         settings.isDarkMode
-                            ? FluentIcons.weather_sunny_24_regular
-                            : FluentIcons.dark_theme_24_regular,
+                            ? Icons.light_mode_outlined
+                            : Icons.dark_mode_outlined,
                         color: Colors.black,
                       ),
                       onPressed: () {
@@ -153,7 +141,7 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                   // Settings
                   IconButton(
                     icon: const Icon(
-                      FluentIcons.settings_24_regular,
+                      Icons.settings_outlined,
                       color: Colors.black,
                     ),
                     onPressed: () {
@@ -183,7 +171,7 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                           hintText: 'Search customers...',
                           hintStyle: TextStyle(color: Colors.grey.shade500),
                           prefixIcon: Icon(
-                            FluentIcons.search_24_regular,
+                            Icons.search_rounded,
                             color: Colors.grey.shade500,
                           ),
                           border: InputBorder.none,
@@ -216,7 +204,7 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          FluentIcons.person_24_regular,
+                          Icons.person_3_outlined,
                           size: 48,
                           color: Colors.grey.shade300,
                         ),
