@@ -382,9 +382,9 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
   ) {
     // Check if L-Corner or Custom to show extra fields
     final isLCorner =
-        controller.selectedType == 'LC' ||
+        controller.selectedType == WindowType.lCorner ||
         controller.selectedType == 'L-Corner';
-    final isCustom = controller.selectedType == 'CUST';
+    final isCustom = controller.selectedType == WindowType.custom;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -616,17 +616,32 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
 
         // Type Selection Chips
         Row(
-          children: ['3T', '2T', 'LC', 'FIX', 'More'].map((type) {
-            final isSelected = controller.selectedType == type;
+          children: ['3T', '2T', WindowType.lCorner, 'FIX', 'More'].map((
+            typeCode,
+          ) {
+            final isSelected = controller.selectedType == typeCode;
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final unselectedBg = isDark
+                ? const Color(0xFF2C2C2E)
+                : Colors.white;
+            final unselectedBorder = isDark
+                ? const Color(0xFF3A3A3C)
+                : const Color(0xFFE5E7EB);
+            final unselectedText = isDark
+                ? Colors.white70
+                : const Color(0xFF374151);
+
             return Expanded(
               child: Padding(
-                padding: EdgeInsets.only(right: type != 'More' ? 8 : 0),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: GestureDetector(
                   onTap: () {
-                    if (type == 'More') {
+                    if (typeCode == 'More') {
                       _showMoreTypesMenu(controller);
                     } else {
-                      setState(() => controller.selectedType = type);
+                      setState(() {
+                        controller.selectedType = typeCode;
+                      });
                     }
                   },
                   child: Container(
@@ -634,21 +649,19 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
                     decoration: BoxDecoration(
                       color: isSelected
                           ? const Color(0xFF2563EB)
-                          : Colors.white,
+                          : unselectedBg,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: isSelected
                             ? const Color(0xFF2563EB)
-                            : const Color(0xFFE5E7EB),
+                            : unselectedBorder,
                       ),
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      type == 'More' ? 'More ▾' : type,
+                      typeCode == 'More' ? 'More ▾' : typeCode,
                       style: TextStyle(
-                        color: isSelected
-                            ? Colors.white
-                            : const Color(0xFF374151),
+                        color: isSelected ? Colors.white : unselectedText,
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
                       ),
@@ -664,21 +677,30 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
   }
 
   InputDecoration _inputDecoration(String label) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hintColor = isDark ? Colors.grey.shade400 : const Color(0xFF6B7280);
+    final fillColor = isDark
+        ? const Color(0xFF2C2C2E)
+        : Colors.white; // Changed from white to theme-aware
+    // Note: If using standard theme input decoration, better to use null or Theme colors.
+    // Keeping similar to previous style but dark-aware.
+
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(
+      labelStyle: TextStyle(
         fontSize: 15,
-        color: Color(0xFF6B7280),
+        color: hintColor,
       ), // Bigger placeholder
-      floatingLabelStyle: const TextStyle(
+      floatingLabelStyle: TextStyle(
         fontSize: 14, // +8px from before (was 12, now 14)
-        color: Color(0xFF2563EB),
+        color: const Color(0xFF2563EB),
         fontWeight: FontWeight.w600,
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       filled: true,
-      fillColor: Colors.white,
+      fillColor:
+          fillColor, // Explicitly set fill color to override default if needed or strictly match design
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: Color(0xFFE5E7EB)),

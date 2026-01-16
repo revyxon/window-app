@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../db/database_helper.dart';
 import 'firestore_service.dart';
 import 'app_logger.dart';
@@ -14,6 +15,7 @@ class SyncService {
   final StreamController<bool> _syncStatusController =
       StreamController<bool>.broadcast();
   Timer? _syncTimer;
+  StreamSubscription? _connectivitySubscription;
   String? _lastError;
 
   Stream<bool> get isSyncingStream => _syncStatusController.stream;
@@ -31,15 +33,18 @@ class SyncService {
       await prefs.setBool('migrated_to_firebase_reset_v3', true);
     }
 
-    // Register device on first launch
+    // Register device on first launch with actual app version
     try {
-      await FirestoreService().registerDevice(appVersion: '1.0.0');
+      final packageInfo = await PackageInfo.fromPlatform();
+      await FirestoreService().registerDevice(appVersion: packageInfo.version);
     } catch (e) {
       await AppLogger().error('SYNC', 'Device registration failed: $e');
     }
 
     // Listen to network changes
-    Connectivity().onConnectivityChanged.listen((result) {
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      result,
+    ) {
       if (!result.contains(ConnectivityResult.none)) {
         syncData();
       }
@@ -253,6 +258,7 @@ class SyncService {
 
   void dispose() {
     _syncTimer?.cancel();
+    _connectivitySubscription?.cancel();
     _syncStatusController.close();
   }
 }

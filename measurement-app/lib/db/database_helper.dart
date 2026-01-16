@@ -333,9 +333,9 @@ class DatabaseHelper {
                   WHEN (w.type = 'LC' OR w.type = 'L-Corner') AND w.width2 IS NOT NULL THEN
                     CASE 
                       WHEN w.formula = 'A' THEN ((w.width + w.width2) * w.height * w.quantity) / 90903.0
-                      ELSE ((w.width * w.height) + (w.width2 * w.height)) * w.quantity / 92903.04
+                      ELSE ((w.width * w.height) + (w.width2 * w.height)) * w.quantity / 90903.0
                     END
-                  ELSE (w.width * w.height * w.quantity) / 92903.04
+                  ELSE (w.width * w.height * w.quantity) / 90903.0
                 END
               ELSE 0 
             END
@@ -363,11 +363,6 @@ class DatabaseHelper {
       await _logger.error('DB', 'readCustomersWithStats FAILED', 'error=$e');
       return [];
     }
-  }
-
-  // Deprecated/Basic version if needed, but we prefer the one above for Home Screen
-  Future<List<Customer>> readAllCustomers() async {
-    return await readCustomersWithStats();
   }
 
   Future<int> updateCustomer(Customer customer) async {
@@ -734,49 +729,13 @@ class DatabaseHelper {
     }
   }
 
+  /// Batch save multiple windows in a single transaction.
+  /// Handles both insert (new) and update (existing) operations.
+  /// Preserves sync_status = 1 for newly created items that haven't been synced yet.
   Future<void> batchSaveWindows(List<Window> windows) async {
+    if (windows.isEmpty) return;
+
     final db = await instance.database;
-    await db.transaction((txn) async {
-      final batch = txn.batch();
-      for (var window in windows) {
-        final map = window.toMap();
-        map['updated_at'] = DateTime.now().toIso8601String();
-
-        if (window.id == null) {
-          // CREATE
-          map['id'] = const Uuid().v4();
-          map['sync_status'] = 1;
-          map['is_deleted'] = 0;
-          if (map['created_at'] == null) {
-            map['created_at'] = DateTime.now().toIso8601String();
-          }
-          map['user_id'] = await DeviceIdService.instance.getDeviceId();
-          batch.insert('windows', map);
-        } else {
-          // UPDATE
-          // Check current status only if needed, but for batch efficiency we might skip the read check
-          // and just set to Updated(2) if it was Synced(0).
-          // However, if it was Created(1), it should stay 1.
-          // Reading inside batch for every row might be slow?
-          // Let's optimisticly set to 2, or maybe reading is fine in txn.
-          // Better: Use `txn.query` to check.
-          // For simplicity and speed in batch, we can assume typical update flow.
-          // But to be correct:
-
-          // We can't easily read inside the batch commit loop easily if we use batch.commit().
-          // If we don't use batch(), we can await txn.query.
-          // `db.transaction` allows async await.
-
-          // Let's use individual txn operations instead of batch() object for logic handling
-          // OR just use SQL: UPDATE windows SET ... WHERE id=?
-          // Setting sync_status logic in SQL:
-          // sync_status = CASE WHEN sync_status = 1 THEN 1 ELSE 2 END
-          map['sync_status'] = 2; // Default
-        }
-      }
-    });
-
-    // Re-implementing with individual txn awaits for correctness on SyncStatus logic
     await db.transaction((txn) async {
       for (var window in windows) {
         final map = window.toMap();

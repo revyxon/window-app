@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-// import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import '../models/customer.dart';
 import '../providers/app_provider.dart';
 import '../utils/fast_page_route.dart';
@@ -9,7 +8,10 @@ import '../utils/constant_data.dart';
 import 'window_input_screen.dart';
 
 class AddCustomerScreen extends StatefulWidget {
-  const AddCustomerScreen({super.key});
+  /// Pass a customer to edit, or null to create new
+  final Customer? customerToEdit;
+
+  const AddCustomerScreen({super.key, this.customerToEdit});
 
   @override
   State<AddCustomerScreen> createState() => _AddCustomerScreenState();
@@ -38,6 +40,31 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
   // Regex for Indian Phone Numbers (10 digits, optional +91)
   final _phoneRegex = RegExp(r'^(\+91[\-\s]?)?[0-9]{10}$');
 
+  bool get _isEditMode => widget.customerToEdit != null;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill fields if editing
+    if (_isEditMode) {
+      final c = widget.customerToEdit!;
+      _nameController.text = c.name;
+      _locationController.text = c.location;
+      _phoneController.text = c.phone ?? '';
+      _rateController.text = c.ratePerSqft?.toString() ?? '';
+      _selectedFramework = c.framework;
+      _isFinalMeasurement = c.isFinalMeasurement;
+      // Handle glass type - check if it's a custom value
+      if (c.glassType != null &&
+          !ConstantData.glassTypes.contains(c.glassType)) {
+        _selectedGlassType = 'Other';
+        _customGlassController.text = c.glassType!;
+      } else {
+        _selectedGlassType = c.glassType;
+      }
+    }
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -54,27 +81,25 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black;
+    final inputTextColor = isDark ? Colors.white : const Color(0xFF1F2937);
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
-          'New Customer',
+          _isEditMode ? 'Edit Customer' : 'New Customer',
           style: TextStyle(
             fontWeight: FontWeight.w700,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white
-                : Colors.black,
+            color: textColor,
             fontSize: 20,
           ),
         ),
         centerTitle: false,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
-        iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white
-              : Colors.black,
-        ),
+        iconTheme: IconThemeData(color: textColor),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, size: 24),
           onPressed: () => Navigator.pop(context),
@@ -92,12 +117,13 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_locationFocus),
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w500,
-                fontSize: 18, // Bigger input text
-                color: Color(0xFF1F2937),
+                fontSize: 18,
+                color: inputTextColor,
               ),
               decoration: _buildInputDecoration(
+                context,
                 'Customer Name *',
                 Icons.person_outline_rounded,
               ),
@@ -106,19 +132,19 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Location
             TextFormField(
               controller: _locationController,
               focusNode: _locationFocus,
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_phoneFocus),
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w500,
                 fontSize: 18,
-                color: Color(0xFF1F2937),
+                color: inputTextColor,
               ),
               decoration: _buildInputDecoration(
+                context,
                 'Location *',
                 Icons.location_on_outlined,
               ),
@@ -128,7 +154,6 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Phone
             TextFormField(
               controller: _phoneController,
               focusNode: _phoneFocus,
@@ -139,9 +164,10 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
               style: TextStyle(
                 fontWeight: FontWeight.w500,
                 fontSize: 18,
-                color: Theme.of(context).textTheme.bodyLarge?.color,
+                color: inputTextColor,
               ),
               decoration: _buildInputDecoration(
+                context,
                 'Phone (Optional)',
                 Icons.phone_outlined,
               ),
@@ -174,50 +200,49 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                     padding: EdgeInsets.only(
                       right: f == ConstantData.frameworks.last ? 0 : 12,
                     ),
-                    child: _buildFrameworkButton(f),
+                    child: _buildFrameworkButton(context, f),
                   ),
                 );
               }).toList(),
             ),
             const SizedBox(height: 24),
 
-            // Glass Type
             DropdownButtonFormField<String>(
               initialValue: _selectedGlassType,
-              icon: const Icon(
+              icon: Icon(
                 Icons.keyboard_arrow_down_rounded,
-                color: Color(0xFF6B7280),
+                color: isDark ? Colors.grey.shade400 : const Color(0xFF6B7280),
                 size: 26,
               ),
               style: TextStyle(
                 fontWeight: FontWeight.w500,
-                color: Theme.of(context).textTheme.bodyLarge?.color,
+                color: inputTextColor,
                 fontSize: 18,
               ),
               decoration: _buildInputDecoration(
+                context,
                 'Glass Type (Optional)',
                 Icons.layers_outlined,
               ),
-              // Add 'Other' option
               items: [...ConstantData.glassTypes, 'Other'].map((type) {
                 return DropdownMenuItem(value: type, child: Text(type));
               }).toList(),
               onChanged: (value) => setState(() => _selectedGlassType = value),
             ),
 
-            // Custom Glass Input
             if (_selectedGlassType == 'Other')
               Padding(
                 padding: const EdgeInsets.only(top: 12),
                 child: TextFormField(
                   controller: _customGlassController,
                   textInputAction: TextInputAction.next,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w500,
                     fontSize: 18,
-                    color: Color(0xFF1F2937),
+                    color: inputTextColor,
                   ),
                   decoration: _buildInputDecoration(
+                    context,
                     'Enter Custom Glass Type',
                     Icons.edit_outlined,
                   ),
@@ -226,18 +251,18 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
 
             const SizedBox(height: 16),
 
-            // Rate
             TextFormField(
               controller: _rateController,
               focusNode: _rateFocus,
               keyboardType: TextInputType.number,
               textInputAction: TextInputAction.done,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w500,
                 fontSize: 18,
-                color: Color(0xFF1F2937),
+                color: inputTextColor,
               ),
               decoration: _buildInputDecoration(
+                context,
                 'Rate per Sq.Ft (Optional)',
                 Icons.currency_rupee_rounded,
               ),
@@ -326,42 +351,52 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
     );
   }
 
-  InputDecoration _buildInputDecoration(String label, IconData icon) {
+  InputDecoration _buildInputDecoration(
+    BuildContext context,
+    String label,
+    IconData icon,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final labelColor = isDark ? Colors.grey.shade400 : const Color(0xFF6B7280);
+    final iconColor = isDark ? Colors.grey.shade400 : const Color(0xFF374151);
+    final fillColor = isDark
+        ? const Color(0xFF2C2C2E)
+        : const Color(0xFFF9FAFB);
+    final borderColor = isDark
+        ? const Color(0xFF3A3A3C)
+        : const Color(0xFFE5E7EB);
+    final floatingLabelBg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(
-        color: Color(0xFF6B7280),
-        fontSize: 17, // Bigger placeholder
+      labelStyle: TextStyle(
+        color: labelColor,
+        fontSize: 17,
         fontWeight: FontWeight.w400,
       ),
-      floatingLabelStyle: const TextStyle(
-        color: Color(0xFF2563EB),
-        fontSize: 15, // Bigger floating label - clearly visible on border
+      floatingLabelStyle: TextStyle(
+        color: const Color(0xFF2563EB),
+        fontSize: 15,
         fontWeight: FontWeight.w600,
-        backgroundColor: Colors.white,
+        backgroundColor: floatingLabelBg,
       ),
       floatingLabelBehavior: FloatingLabelBehavior.auto,
       prefixIcon: Padding(
         padding: const EdgeInsets.only(left: 14, right: 10),
-        child: Icon(
-          icon,
-          color: const Color(0xFF374151),
-          size: 26,
-        ), // Bigger icons
+        child: Icon(icon, color: iconColor, size: 26),
       ),
       prefixIconConstraints: const BoxConstraints(minWidth: 50, minHeight: 50),
       filled: true,
-      fillColor: const Color(0xFFF9FAFB),
-      // Use isCollapsed false and proper padding for vertical centering
+      fillColor: fillColor,
       isCollapsed: false,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+        borderSide: BorderSide(color: borderColor, width: 1),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+        borderSide: BorderSide(color: borderColor, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -379,8 +414,15 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
     );
   }
 
-  Widget _buildFrameworkButton(String label) {
+  Widget _buildFrameworkButton(BuildContext context, String label) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isSelected = _selectedFramework == label;
+    final unselectedBg = isDark ? const Color(0xFF2C2C2E) : Colors.white;
+    final unselectedBorder = isDark
+        ? const Color(0xFF3A3A3C)
+        : const Color(0xFFE5E7EB);
+    final unselectedText = isDark ? Colors.white70 : const Color(0xFF374151);
+
     return GestureDetector(
       onTap: () => setState(() => _selectedFramework = label),
       child: AnimatedContainer(
@@ -388,12 +430,10 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
         curve: Curves.easeInOut,
         height: 48,
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF2563EB) : Colors.white,
+          color: isSelected ? const Color(0xFF2563EB) : unselectedBg,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: isSelected
-                ? const Color(0xFF2563EB)
-                : const Color(0xFFE5E7EB),
+            color: isSelected ? const Color(0xFF2563EB) : unselectedBorder,
             width: 1.5,
           ),
           boxShadow: isSelected
@@ -410,7 +450,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : const Color(0xFF374151),
+            color: isSelected ? Colors.white : unselectedText,
             fontWeight: FontWeight.w600,
             fontSize: 16,
           ),
@@ -421,38 +461,73 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
 
   Future<void> _saveCustomer() async {
     if (_formKey.currentState!.validate()) {
-      final customer = Customer(
-        name: _nameController.text.trim(),
-        location: _locationController.text.trim(),
-        phone: _phoneController.text.trim().isEmpty
-            ? null
-            : _phoneController.text.trim(),
-        framework: _selectedFramework,
-        glassType: _selectedGlassType == 'Other'
-            ? _customGlassController.text.trim()
-            : _selectedGlassType,
-        ratePerSqft: _rateController.text.trim().isEmpty
-            ? null
-            : double.tryParse(_rateController.text.trim()),
-        isFinalMeasurement: _isFinalMeasurement,
-        createdAt: DateTime.now(),
-      );
+      final provider = Provider.of<AppProvider>(context, listen: false);
 
-      try {
-        final savedCustomer = await Provider.of<AppProvider>(
-          context,
-          listen: false,
-        ).addCustomer(customer);
-        if (!mounted) return;
-
-        // loadCustomers is handled inside addCustomer
-
-        Navigator.push(
-          context,
-          FastPageRoute(page: WindowInputScreen(customer: savedCustomer)),
+      if (_isEditMode) {
+        // UPDATE existing customer
+        final updated = widget.customerToEdit!.copyWith(
+          name: _nameController.text.trim(),
+          location: _locationController.text.trim(),
+          phone: _phoneController.text.trim().isEmpty
+              ? null
+              : _phoneController.text.trim(),
+          framework: _selectedFramework,
+          glassType: _selectedGlassType == 'Other'
+              ? _customGlassController.text.trim()
+              : _selectedGlassType,
+          ratePerSqft: _rateController.text.trim().isEmpty
+              ? null
+              : double.tryParse(_rateController.text.trim()),
+          isFinalMeasurement: _isFinalMeasurement,
+          updatedAt: DateTime.now(),
         );
-      } catch (e) {
-        ToastService.show(context, 'Error saving customer: $e', isError: true);
+
+        try {
+          await provider.updateCustomer(updated);
+          if (!mounted) return;
+          ToastService.show(context, 'Customer updated successfully');
+          Navigator.pop(context, updated); // Return updated customer
+        } catch (e) {
+          ToastService.show(
+            context,
+            'Error updating customer: $e',
+            isError: true,
+          );
+        }
+      } else {
+        // CREATE new customer
+        final customer = Customer(
+          name: _nameController.text.trim(),
+          location: _locationController.text.trim(),
+          phone: _phoneController.text.trim().isEmpty
+              ? null
+              : _phoneController.text.trim(),
+          framework: _selectedFramework,
+          glassType: _selectedGlassType == 'Other'
+              ? _customGlassController.text.trim()
+              : _selectedGlassType,
+          ratePerSqft: _rateController.text.trim().isEmpty
+              ? null
+              : double.tryParse(_rateController.text.trim()),
+          isFinalMeasurement: _isFinalMeasurement,
+          createdAt: DateTime.now(),
+        );
+
+        try {
+          final savedCustomer = await provider.addCustomer(customer);
+          if (!mounted) return;
+
+          Navigator.push(
+            context,
+            FastPageRoute(page: WindowInputScreen(customer: savedCustomer)),
+          );
+        } catch (e) {
+          ToastService.show(
+            context,
+            'Error saving customer: $e',
+            isError: true,
+          );
+        }
       }
     }
   }

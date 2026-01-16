@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../utils/app_colors.dart';
+
 import '../utils/animation_constants.dart';
 
 /// Premium glass container with micro-animation press feedback
@@ -49,9 +49,17 @@ class _GlassContainerState extends State<GlassContainer> {
           margin: widget.margin,
           padding: widget.padding,
           decoration: BoxDecoration(
-            color: widget.color ?? AppColors.cardSurface,
+            color:
+                widget.color ??
+                Theme.of(context).cardTheme.color ??
+                Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(widget.borderRadius),
-            border: Border.all(color: AppColors.border, width: 1.0),
+            border: Border.all(
+              color: Theme.of(
+                context,
+              ).colorScheme.outline.withValues(alpha: 0.3),
+              width: 1.0,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.02),

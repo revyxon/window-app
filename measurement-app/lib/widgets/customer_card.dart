@@ -49,18 +49,23 @@ class CustomerCard extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5),
+                      color: Theme.of(context).colorScheme.primaryContainer
+                          .withOpacity(
+                            0.5,
+                          ), // Replaced hardcoded background color
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           FluentIcons.checkmark_circle_24_filled,
                           size: 16,
-                          color: Color(0xFF10B981),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary, // Replaced hardcoded icon color
                         ),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Text(
                           'Final',
                           style: TextStyle(
@@ -116,17 +121,21 @@ class CustomerCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                     // SqFt (Optimized: No FutureBuilder)
-                    const Icon(
+                    Icon(
                       FluentIcons.ruler_24_regular,
                       size: 18,
-                      color: Colors.black54,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                     const SizedBox(width: 4),
                     Text(
                       '${customer.totalSqFt.toStringAsFixed(1)} sqft',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w500,
-                        color: Colors.black54,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                     ),
                   ],

@@ -8,6 +8,8 @@ import '../services/log_service.dart';
 import '../screens/locked_screen.dart';
 
 import '../screens/offline_lock_screen.dart';
+import '../screens/update_screen.dart';
+import '../utils/globals.dart';
 
 /// SystemGuard V2: Invisible License Check with 7-Day Grace Period
 class SystemGuard extends StatefulWidget {
@@ -96,7 +98,28 @@ class _SystemGuardState extends State<SystemGuard> with WidgetsBindingObserver {
     AppLogger().info('GUARD', 'Running invisible validation (15s triggered)');
 
     // Check Update first (optional, silent)
-    UpdateService().checkForUpdate();
+    // Check Update first (optional, silent)
+    try {
+      final updateResult = await UpdateService().checkForUpdate();
+      if (updateResult.hasUpdate && mounted) {
+        AppLogger().info('GUARD', 'Update found: ${updateResult.version}');
+        GlobalParams.navigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (ctx) => UpdateScreen(
+              updateResult: updateResult,
+              onSkip: () {
+                Navigator.of(ctx).pop();
+                if (updateResult.version != null) {
+                  UpdateService().skipUpdate(updateResult.version!);
+                }
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      AppLogger().error('GUARD', 'Update check failed: $e');
+    }
 
     // Validate License
     await LicenseService().validate();

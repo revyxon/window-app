@@ -15,7 +15,7 @@ import '../services/data_import_service.dart';
 import '../models/activity_log.dart';
 import '../widgets/premium_toast.dart';
 import 'package:lottie/lottie.dart';
-import '../main.dart'; // For GlobalParams
+import '../utils/globals.dart';
 import 'add_customer_screen.dart';
 
 class MeasurementListScreen extends StatefulWidget {
@@ -112,7 +112,7 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Consumer<AppProvider>(
         builder: (context, provider, child) {
           final customers = provider.customers.where((c) {
@@ -127,20 +127,26 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                 floating: false,
                 pinned: true,
                 elevation: 0,
-                backgroundColor: Colors.white,
+                backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
                 surfaceTintColor: Colors.transparent,
                 toolbarHeight: 60,
                 title: Row(
                   children: [
-                    const Icon(Icons.straighten_outlined, color: Colors.black),
+                    Icon(
+                      Icons.straighten_outlined,
+                      color: Theme.of(context).iconTheme.color,
+                    ),
                     const SizedBox(width: 12),
-                    const Text(
+                    Text(
                       'Measurements',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 24,
-                      ),
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 24,
+                            color: Theme.of(
+                              context,
+                            ).textTheme.titleLarge?.color,
+                          ),
                     ),
                   ],
                 ),
@@ -148,17 +154,19 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                   // Manual Sync Button (Cloud icon)
                   IconButton(
                     icon: _isSyncing
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.black54,
+                              color: Theme.of(
+                                context,
+                              ).iconTheme.color?.withOpacity(0.7),
                             ),
                           )
-                        : const Icon(
+                        : Icon(
                             Icons.cloud_sync_outlined,
-                            color: Colors.black,
+                            color: Theme.of(context).iconTheme.color,
                           ),
                     onPressed: _triggerManualSync,
                     tooltip: 'Sync to cloud',
@@ -170,7 +178,7 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                         settings.isDarkMode
                             ? Icons.light_mode_outlined
                             : Icons.dark_mode_outlined,
-                        color: Colors.black,
+                        color: Theme.of(context).iconTheme.color,
                       ),
                       onPressed: () {
                         Haptics.light();
@@ -180,9 +188,9 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                   ),
                   // Settings
                   IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.settings_outlined,
-                      color: Colors.black,
+                      color: Theme.of(context).iconTheme.color,
                     ),
                     onPressed: () {
                       Haptics.light();
@@ -199,20 +207,29 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
+                        color:
+                            Theme.of(context).inputDecorationTheme.fillColor ??
+                            Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.outline.withValues(alpha: 0.2),
+                        ),
                       ),
                       child: TextField(
                         controller: _searchController,
                         onChanged: (value) =>
                             setState(() => _searchQuery = value),
-                        style: const TextStyle(fontSize: 16),
+                        style: Theme.of(context).textTheme.bodyLarge,
                         decoration: InputDecoration(
                           hintText: 'Search customers...',
-                          hintStyle: TextStyle(color: Colors.grey.shade500),
+                          hintStyle: Theme.of(
+                            context,
+                          ).inputDecorationTheme.hintStyle,
                           prefixIcon: Icon(
                             Icons.search_rounded,
-                            color: Colors.grey.shade500,
+                            color: Theme.of(context).hintColor,
                           ),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
@@ -276,12 +293,11 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                             _searchQuery.isEmpty
                                 ? 'No Measurements Yet'
                                 : 'No results found',
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF1F2937),
-                              letterSpacing: -0.5,
-                            ),
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.5,
+                                ),
                           ),
                           const SizedBox(height: 12),
                           Padding(
@@ -291,11 +307,15 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                                   ? 'Create your first customer measurement or import a backup file to get started.'
                                   : 'We couldn\'t find any customers matching "$_searchQuery". Try a different name.',
                               textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 16,
-                                height: 1.5,
-                              ),
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.color
+                                        ?.withValues(alpha: 0.7),
+                                    height: 1.5,
+                                  ),
                             ),
                           ),
                           const SizedBox(height: 32),

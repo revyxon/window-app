@@ -23,12 +23,6 @@ class PermissionHelper {
     return true;
   }
 
-  /// Check if action is allowed (silent check)
-  bool canPerform(String action) {
-    // All actions allowed if not locked
-    return !LicenseService().isLocked;
-  }
-
   /// Show blocked action dialog
   void _showBlockedDialog(BuildContext context, String actionName) {
     showDialog(
@@ -68,28 +62,6 @@ class PermissionHelper {
             child: const Text('OK'),
           ),
         ],
-      ),
-    );
-  }
-
-  /// Show action blocked snackbar (less intrusive)
-  void showBlockedSnackbar(BuildContext context, String actionName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(
-              FluentIcons.shield_error_24_regular,
-              color: Colors.white,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: Text('$actionName is disabled by admin')),
-          ],
-        ),
-        backgroundColor: Colors.orange.shade700,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
       ),
     );
   }

@@ -12,6 +12,7 @@ import 'utils/theme.dart';
 import 'screens/main_screen.dart';
 import 'widgets/system_guard.dart';
 import 'utils/logging_navigator_observer.dart';
+import 'utils/globals.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 void main() async {
@@ -66,12 +67,6 @@ void _handleImportFile(String path) {
   // For now, let's use a simple global variable or passing it to MyApp
   // A better approach is to use a valid navigator key.
   GlobalParams.importFilePath = path;
-}
-
-class GlobalParams {
-  static String? importFilePath;
-  static final GlobalKey<NavigatorState> navigatorKey =
-      GlobalKey<NavigatorState>();
 }
 
 class MyApp extends StatelessWidget {

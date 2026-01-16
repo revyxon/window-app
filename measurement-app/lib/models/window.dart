@@ -1,4 +1,5 @@
 import '../utils/window_calculator.dart';
+import '../utils/window_types.dart';
 
 class Window {
   final String? id;
@@ -45,7 +46,7 @@ class Window {
   // Calculated property for SqFt
   double get sqFt {
     // Basic fields are required
-    if (width2 != null && (type == 'LC' || type == 'L-Corner')) {
+    if (width2 != null && (type == WindowType.lCorner || type == 'L-Corner')) {
       // L-Corner Logic
       return WindowCalculator.calculateDisplayedSqFt(
         width: width,

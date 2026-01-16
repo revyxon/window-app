@@ -6,6 +6,7 @@ import '../models/customer.dart';
 import '../models/window.dart';
 import '../providers/app_provider.dart';
 import 'window_input_screen.dart';
+import 'add_customer_screen.dart';
 import '../utils/window_calculator.dart';
 import '../widgets/share_bottom_sheet.dart';
 import '../widgets/print_bottom_sheet.dart';
@@ -50,76 +51,126 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _menuItem(FluentIcons.edit_24_regular, 'Edit Customer', () {
-              Navigator.pop(context);
-              // Check edit_customer permission
-              if (!PermissionHelper().checkAndShowDialog(
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final bgColor = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _menuItem(
                 context,
-                'edit_customer',
+                FluentIcons.edit_24_regular,
                 'Edit Customer',
-              )) {
-                return;
-              }
-            }),
-            _menuItem(FluentIcons.grid_24_regular, 'Edit Windows', () {
-              Navigator.pop(context);
-              // Check edit_window permission
-              if (!PermissionHelper().checkAndShowDialog(
+                () async {
+                  Navigator.pop(context);
+                  // Check edit_customer permission
+                  if (!PermissionHelper().checkAndShowDialog(
+                    context,
+                    'edit_customer',
+                    'Edit Customer',
+                  )) {
+                    return;
+                  }
+                  // Navigate to edit screen
+                  final updatedCustomer = await Navigator.push<Customer>(
+                    context,
+                    FastPageRoute(
+                      page: AddCustomerScreen(customerToEdit: _customer),
+                    ),
+                  );
+                  // Refresh if customer was updated
+                  if (updatedCustomer != null && mounted) {
+                    setState(() {
+                      _customer = updatedCustomer;
+                    });
+                  }
+                },
+              ),
+              _menuItem(
                 context,
-                'edit_window',
+                FluentIcons.grid_24_regular,
                 'Edit Windows',
-              )) {
-                return;
-              }
-              Navigator.push(
+                () {
+                  Navigator.pop(context);
+                  // Check edit_window permission
+                  if (!PermissionHelper().checkAndShowDialog(
+                    context,
+                    'edit_window',
+                    'Edit Windows',
+                  )) {
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    FastPageRoute(page: WindowInputScreen(customer: _customer)),
+                  ).then((_) => setState(() {}));
+                },
+              ),
+              _menuItem(
                 context,
-                FastPageRoute(page: WindowInputScreen(customer: _customer)),
-              ).then((_) => setState(() {}));
-            }),
-            _menuItem(FluentIcons.sparkle_24_regular, 'Admin Insights', () {
-              Navigator.pop(context);
-              _showAdminInsights(context);
-            }),
-            const Divider(),
-            _menuItem(FluentIcons.delete_24_regular, 'Delete Customer', () {
-              Navigator.pop(context);
-              // Check delete_customer permission
-              if (!PermissionHelper().checkAndShowDialog(
+                FluentIcons.sparkle_24_regular,
+                'Admin Insights',
+                () {
+                  Navigator.pop(context);
+                  _showAdminInsights(context);
+                },
+              ),
+              Divider(
+                color: isDark ? const Color(0xFF3A3A3C) : Colors.grey.shade300,
+              ),
+              _menuItem(
                 context,
-                'delete_customer',
+                FluentIcons.delete_24_regular,
                 'Delete Customer',
-              )) {
-                return;
-              }
-              _showDeleteConfirmation(context);
-            }, isDestructive: true),
-          ],
-        ),
-      ),
+                () {
+                  Navigator.pop(context);
+                  // Check delete_customer permission
+                  if (!PermissionHelper().checkAndShowDialog(
+                    context,
+                    'delete_customer',
+                    'Delete Customer',
+                  )) {
+                    return;
+                  }
+                  _showDeleteConfirmation(context);
+                },
+                isDestructive: true,
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
   Widget _menuItem(
+    BuildContext context,
     IconData icon,
     String label,
     VoidCallback onTap, {
     bool isDestructive = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final defaultColor = isDark ? Colors.white70 : const Color(0xFF374151);
+    final textColor = isDark ? Colors.white : Colors.black;
+
     return ListTile(
       leading: Icon(
         icon,
-        color: isDestructive ? Colors.red : const Color(0xFF374151),
+        color: isDestructive ? Colors.red : defaultColor,
         size: 24,
       ),
       title: Text(
         label,
         style: TextStyle(
-          color: isDestructive ? Colors.red : Colors.black,
+          color: isDestructive ? Colors.red : textColor,
           fontWeight: FontWeight.w500,
           fontSize: 16,
         ),
