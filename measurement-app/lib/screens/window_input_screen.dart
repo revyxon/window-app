@@ -8,6 +8,7 @@ import '../models/window.dart';
 import '../providers/app_provider.dart';
 import '../providers/settings_provider.dart';
 import '../utils/window_types.dart';
+import '../utils/window_calculator.dart';
 
 class WindowInputScreen extends StatefulWidget {
   final Customer customer;
@@ -100,23 +101,23 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
   double _calculateCardSqFt(WindowInputController c) {
     double w = double.tryParse(c.widthController.text) ?? 0;
     double h = double.tryParse(c.heightController.text) ?? 0;
+    double w2 = 0;
 
     // Check for L-Corner
-    if (c.selectedType == 'LC' || c.selectedType == 'L-Corner') {
-      double w2 = double.tryParse(c.width2Controller.text) ?? 0;
-
-      final settings = Provider.of<SettingsProvider>(context, listen: false);
-      if (settings.lCornerFormula == 'A') {
-        // Formula A: (W1 + W2) * H / 90903
-        return ((w + w2) * h) / 90903.0 * c.quantity;
-      } else {
-        // Formula B: (W1 * H) + (W2 * H) / standard (or displayed?)
-        // Assuming standard divisor for sqft calculation
-        return ((w * h) + (w2 * h)) / 92903.04 * c.quantity;
-      }
+    if (c.selectedType == WindowType.lCorner) {
+      w2 = double.tryParse(c.width2Controller.text) ?? 0;
     }
 
-    return (w * h) / 92903.04 * c.quantity;
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+
+    return WindowCalculator.calculateDisplayedSqFt(
+      width: w,
+      height: h,
+      quantity: c.quantity.toDouble(),
+      width2: w2,
+      type: c.selectedType,
+      isFormulaA: settings.lCornerFormula == 'A',
+    );
   }
 
   double get _totalSqFt {

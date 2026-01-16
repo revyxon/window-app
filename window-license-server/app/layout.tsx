@@ -1,4 +1,6 @@
+import './globals.css';
 import React from 'react';
+import { Toaster } from "@/components/ui/sonner"
 
 export const metadata = {
     title: 'Window License Server',
@@ -12,7 +14,10 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en">
-            <body style={{ margin: 0, backgroundColor: '#f5f5f5' }}>{children}</body>
+            <body>
+                {children}
+                <Toaster />
+            </body>
         </html>
     );
 }

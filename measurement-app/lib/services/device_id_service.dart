@@ -1,5 +1,3 @@
-import 'dart:io';
-import 'package:device_info_plus/device_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
@@ -25,26 +23,8 @@ class DeviceIdService {
       return _deviceId!;
     }
 
-    // Generate UUID from device info
-    String seedString;
-    final deviceInfo = DeviceInfoPlugin();
-
-    if (Platform.isAndroid) {
-      final androidInfo = await deviceInfo.androidInfo;
-      // Use Android ID + model + brand for uniqueness
-      seedString =
-          '${androidInfo.id}_${androidInfo.model}_${androidInfo.brand}';
-    } else if (Platform.isIOS) {
-      final iosInfo = await deviceInfo.iosInfo;
-      seedString =
-          iosInfo.identifierForVendor ??
-          'ios_${DateTime.now().millisecondsSinceEpoch}';
-    } else {
-      seedString = 'device_${DateTime.now().millisecondsSinceEpoch}';
-    }
-
-    // Convert to valid UUID v5 (namespace-based)
-    _deviceId = const Uuid().v5(Namespace.url.value, seedString);
+    // Generate random UUID v4 if no ID exists (simple fallback)
+    _deviceId = const Uuid().v4();
 
     // Cache it
     await prefs.setString(_prefKey, _deviceId!);

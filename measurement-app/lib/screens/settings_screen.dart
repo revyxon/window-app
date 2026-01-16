@@ -7,7 +7,6 @@ import '../providers/app_provider.dart';
 import '../services/device_id_service.dart';
 import '../services/sync_service.dart';
 import '../utils/app_colors.dart';
-import '../widgets/glass_container.dart';
 import 'about_screen.dart';
 import 'log_viewer_screen.dart';
 
@@ -32,180 +31,172 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadData() async {
     final stats = await DatabaseHelper.instance.getDatabaseStats();
     final deviceId = await DeviceIdService.instance.getDeviceId();
-    setState(() {
-      _dbStats = stats;
-      _deviceId = deviceId;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _dbStats = stats;
+        _deviceId = deviceId;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: const Color(0xFFF2F4F7), // Light background
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-
-        title: Row(
-          children: [
-            const Icon(Icons.settings_outlined, color: Colors.black),
-            const SizedBox(width: 12),
-            const Text(
-              'Settings',
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
+        title: const Text(
+          'Settings',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 24),
         ),
         centerTitle: false,
+        backgroundColor: const Color(0xFFF2F4F7),
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
       ),
       body: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             children: [
-              // Device Card
-              _buildDeviceCard(),
-              const SizedBox(height: 20),
-
-              // Appearance
-              _buildSectionTitle('Appearance'),
-              const SizedBox(height: 10),
-              GlassContainer(
-                padding: const EdgeInsets.all(4),
-                child: Column(
-                  children: [
-                    _buildSwitchTile(
-                      icon: FluentIcons.dark_theme_24_regular,
-                      title: 'Dark Mode',
-                      subtitle: settings.isDarkMode ? 'On' : 'Off',
+              _buildSectionHeader('APPEARANCE'),
+              _buildCard(
+                children: [
+                  _buildSettingItem(
+                    icon: FluentIcons.dark_theme_24_regular,
+                    iconColor: Colors.purple,
+                    title: 'Theme',
+                    subtitle: settings.isDarkMode ? 'Dark mode' : 'Light mode',
+                    trailing: Switch.adaptive(
                       value: settings.isDarkMode,
+                      activeTrackColor: AppColors.primary,
                       onChanged: (v) => settings.setThemeMode(
                         v ? ThemeMode.dark : ThemeMode.light,
                       ),
                     ),
-                    _buildDivider(),
-                    _buildSliderTile(
-                      icon: FluentIcons.text_font_size_24_regular,
-                      title: 'Text Size',
-                      value: settings.textScale,
-                      label: _getTextSizeLabel(settings.textScale),
-                      onChanged: (v) => settings.setTextScale(v),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Calculation
-              _buildSectionTitle('Calculation'),
-              const SizedBox(height: 10),
-              GlassContainer(
-                padding: const EdgeInsets.all(4),
-                child: Column(
-                  children: [
-                    _buildTile(
-                      icon: FluentIcons.calculator_24_regular,
-                      title: 'Displayed Formula',
-                      subtitle:
-                          'W × H ÷ ${settings.displayedFormula.toStringAsFixed(0)}',
-                      onTap: () => _showFormulaDialog(context, settings, true),
-                    ),
-                    _buildDivider(),
-                    _buildTile(
-                      icon: FluentIcons.calculator_24_regular,
-                      title: 'Actual Formula',
-                      subtitle:
-                          'W × H ÷ ${settings.actualFormula.toStringAsFixed(2)}',
-                      onTap: () => _showFormulaDialog(context, settings, false),
-                    ),
-                    _buildDivider(),
-                    _buildInfoRow(
-                      icon: FluentIcons.arrow_trending_24_regular,
-                      title: 'Customer Bonus',
-                      value:
-                          '${((settings.displayedFormula / settings.actualFormula - 1) * -100).toStringAsFixed(1)}%',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Data
-              _buildSectionTitle('Data'),
-              const SizedBox(height: 10),
-              GlassContainer(
-                padding: const EdgeInsets.all(4),
-                child: Column(
-                  children: [
-                    _buildInfoRow(
-                      icon: FluentIcons.database_24_regular,
-                      title: 'Database',
-                      value: _isLoading
-                          ? '...'
-                          : '${_dbStats['customerCount'] ?? 0} customers, ${_dbStats['windowCount'] ?? 0} windows',
-                    ),
-                    _buildDivider(),
-                    _buildTile(
-                      icon: FluentIcons.arrow_sync_24_regular,
-                      title: 'Force Full Resync',
-                      subtitle: 'Re-upload all data',
-                      onTap: () => _handleForceResync(context),
-                    ),
-                    _buildDivider(),
-                    _buildTile(
-                      icon: FluentIcons.delete_24_regular,
-                      title: 'Clear All Data',
-                      subtitle: 'Delete everything',
-                      iconColor: Colors.red,
-                      onTap: () => _showClearDataDialog(context),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // About
-              _buildSectionTitle('About'),
-              const SizedBox(height: 10),
-              GlassContainer(
-                padding: const EdgeInsets.all(4),
-                child: Column(
-                  children: [
-                    _buildTile(
-                      icon: FluentIcons.info_24_regular,
-                      title: 'About Window Manager',
-                      subtitle: 'Version 2.0.0',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AboutScreen()),
-                      ),
-                    ),
-                    _buildDivider(),
-                    _buildTile(
-                      icon: FluentIcons.arrow_reset_24_regular,
-                      title: 'Reset Settings',
-                      subtitle: 'Restore defaults',
-                      onTap: () => _showResetDialog(context, settings),
-                    ),
-                    _buildDivider(),
-                    _buildTile(
-                      icon: FluentIcons.code_24_regular,
-                      title: 'View Logs',
-                      subtitle: 'Debug & diagnostics',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const LogViewerScreen(),
+                  ),
+                  _buildDivider(),
+                  _buildSettingItem(
+                    icon: FluentIcons.text_font_size_24_regular,
+                    iconColor: Colors.blue,
+                    title: 'Text Size',
+                    subtitle: _getTextSizeLabel(settings.textScale),
+                    trailing: SizedBox(
+                      width: 120,
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 4,
+                          thumbShape: const RoundSliderThumbShape(
+                            enabledThumbRadius: 6,
+                          ),
+                          overlayShape: SliderComponentShape.noOverlay,
+                        ),
+                        child: Slider(
+                          value: settings.textScale,
+                          min: 0.8,
+                          max: 1.4,
+                          divisions: 6,
+                          activeColor: AppColors.primary,
+                          onChanged: (v) => settings.setTextScale(v),
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+              _buildSectionHeader('CALCULATION'),
+              _buildCard(
+                children: [
+                  _buildSettingItem(
+                    icon: FluentIcons.calculator_24_regular,
+                    iconColor: Colors.orange,
+                    title: 'Displayed Formula',
+                    subtitle:
+                        'W × H ÷ ${settings.displayedFormula.toStringAsFixed(0)}',
+                    onTap: () => _showFormulaDialog(context, settings, true),
+                  ),
+                  _buildDivider(),
+                  _buildSettingItem(
+                    icon: FluentIcons.math_formula_24_regular,
+                    iconColor: Colors.orange,
+                    title: 'Actual Formula',
+                    subtitle:
+                        'W × H ÷ ${settings.actualFormula.toStringAsFixed(2)}',
+                    onTap: () => _showFormulaDialog(context, settings, false),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+              _buildSectionHeader('DATA'),
+              _buildCard(
+                children: [
+                  _buildSettingItem(
+                    icon: FluentIcons.database_24_regular,
+                    iconColor: Colors.teal,
+                    title: 'Database Stats',
+                    subtitle: _isLoading
+                        ? 'Loading...'
+                        : '${_dbStats['customerCount'] ?? 0} customers, ${_dbStats['windowCount'] ?? 0} windows',
+                    onTap: () {}, // Just display
+                  ),
+                  _buildDivider(),
+                  _buildSettingItem(
+                    icon: FluentIcons.arrow_upload_24_regular,
+                    iconColor: Colors.green,
+                    title: 'Force Resync',
+                    subtitle: 'Re-upload all data to cloud',
+                    onTap: () => _handleForceResync(context),
+                  ),
+                  _buildDivider(),
+                  _buildSettingItem(
+                    icon: FluentIcons.delete_24_regular,
+                    iconColor: Colors.red,
+                    title: 'Clear All Data',
+                    subtitle: 'Delete everything permanently',
+                    onTap: () => _showClearDataDialog(context),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+              _buildSectionHeader('ABOUT'),
+              _buildCard(
+                children: [
+                  _buildSettingItem(
+                    icon: FluentIcons.info_24_regular,
+                    iconColor: Colors.grey,
+                    title: 'About App',
+                    subtitle: 'Version 2.0.0 • Tap to learn more',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AboutScreen()),
+                    ),
+                  ),
+                  _buildDivider(),
+                  _buildSettingItem(
+                    icon: FluentIcons.code_24_regular,
+                    iconColor: Colors.grey,
+                    title: 'Logs',
+                    subtitle: 'View application logs',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const LogViewerScreen(),
+                      ),
+                    ),
+                  ),
+                  _buildDivider(),
+                  _buildSettingItem(
+                    icon: FluentIcons.phone_24_regular,
+                    iconColor: Colors.blueGrey,
+                    title: 'Device ID',
+                    subtitle: _deviceId,
+                    onTap: () {}, // Just display
+                  ),
+                ],
               ),
               const SizedBox(height: 40),
             ],
@@ -215,267 +206,110 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildDeviceCard() {
-    return GlassContainer(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withAlpha(25),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              FluentIcons.phone_24_filled,
-              color: AppColors.primary,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'This Device',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _isLoading
-                      ? 'Loading...'
-                      : 'ID: ${_deviceId.length > 12 ? '${_deviceId.substring(0, 12)}...' : _deviceId}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade600,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: AppColors.success.withAlpha(25),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  FluentIcons.cloud_checkmark_24_filled,
-                  color: AppColors.success,
-                  size: 14,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Synced',
-                  style: TextStyle(
-                    color: AppColors.success,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.primary,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: Colors.grey.shade600,
+  Widget _buildCard({required List<Widget> children}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildSettingItem({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1F2937),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade500,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (trailing != null)
+                trailing
+              else if (onTap != null)
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: Colors.grey.shade400,
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildDivider() {
-    return Divider(height: 1, color: AppColors.border, indent: 56);
-  }
-
-  Widget _buildTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    VoidCallback? onTap,
-    Color? iconColor,
-  }) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: (iconColor ?? AppColors.primary).withAlpha(25),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: iconColor ?? AppColors.primary, size: 20),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-      ),
-      trailing: onTap != null
-          ? Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20)
-          : null,
-      onTap: onTap,
-    );
-  }
-
-  Widget _buildSwitchTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withAlpha(25),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: AppColors.primary, size: 20),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-      ),
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
-        activeThumbColor: AppColors.primary,
-      ),
-    );
-  }
-
-  Widget _buildSliderTile({
-    required IconData icon,
-    required String title,
-    required String label,
-    required double value,
-    required ValueChanged<double> onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withAlpha(25),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: AppColors.primary, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withAlpha(25),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 4,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 7,
-                    ),
-                  ),
-                  child: Slider(
-                    value: value,
-                    min: 0.8,
-                    max: 1.4,
-                    divisions: 6,
-                    activeColor: AppColors.primary,
-                    inactiveColor: AppColors.border,
-                    onChanged: onChanged,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow({
-    required IconData icon,
-    required String title,
-    required String value,
-  }) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withAlpha(25),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: AppColors.primary, size: 20),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-      ),
-      trailing: Text(
-        value,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          color: AppColors.primary,
-        ),
-      ),
+    return Divider(
+      height: 1,
+      thickness: 1,
+      indent: 68,
+      endIndent: 0,
+      color: const Color(0xFFF3F4F6),
     );
   }
 
@@ -484,7 +318,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (scale <= 0.95) return 'Medium';
     if (scale <= 1.05) return 'Default';
     if (scale <= 1.2) return 'Large';
-    return 'XL';
+    return 'Extra Large';
   }
 
   void _showFormulaDialog(
@@ -500,6 +334,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(isDisplayed ? 'Displayed Formula' : 'Actual Formula'),
         content: TextField(
@@ -507,7 +343,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
             labelText: 'Divisor (W × H ÷ ?)',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
         actions: [
@@ -515,7 +351,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
             onPressed: () {
               final v = double.tryParse(controller.text);
               if (v != null && v > 0) {
@@ -536,16 +379,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
             Icon(FluentIcons.warning_24_filled, color: Colors.red),
             SizedBox(width: 8),
-            Text('Clear All?'),
+            Text('Clear All Data?'),
           ],
         ),
         content: const Text(
-          'This will delete ALL customers and windows permanently!',
+          'This action cannot be undone. All customers, measurements, and logs will be permanently deleted.',
         ),
         actions: [
           TextButton(
@@ -555,32 +400,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Clearing cloud and local data...'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              }
-
               try {
-                // 1. Clear Cloud
                 await SyncService().clearCloudData();
-
-                // 2. Clear Local
                 await DatabaseHelper.instance.clearAllData();
                 await Provider.of<AppProvider>(
                   context,
                   listen: false,
                 ).loadCustomers();
-                await _loadData();
-
+                _loadData(); // refresh local stats
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('All data cleared permanently'),
+                      content: Text('All data cleared'),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -589,46 +420,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Failed to clear data: $e'),
+                      content: Text('Error: $e'),
                       backgroundColor: Colors.red,
                     ),
                   );
                 }
               }
             },
-            child: const Text('Clear', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showResetDialog(BuildContext context, SettingsProvider settings) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Reset Settings?'),
-        content: const Text('Restore all settings to defaults.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await settings.resetToDefaults();
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Settings reset'),
-                    backgroundColor: AppColors.success,
-                  ),
-                );
-              }
-            },
-            child: const Text('Reset'),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -636,60 +438,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _handleForceResync(BuildContext context) async {
-    final confirmed =
-        await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Text('Force Full Resync?'),
-            content: const Text(
-              'This will mark all local data as "unsynced" and attempt to re-upload everything to Firebase. Use this if data is missing from the cloud.',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Resync'),
-              ),
-            ],
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Force Resync?'),
+        content: const Text('This will re-upload all local data to the cloud.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
           ),
-        ) ??
-        false;
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Resync'),
+          ),
+        ],
+      ),
+    );
 
-    if (confirmed && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Starting full resync...'),
-          duration: Duration(seconds: 1),
-        ),
-      );
-
-      try {
-        await DatabaseHelper.instance.markAllAsUnsynced();
-        await SyncService().syncData();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Resync initiated successfully'),
-              backgroundColor: AppColors.success,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Resync error: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+    if (confirmed == true && mounted) {
+      await DatabaseHelper.instance.markAllAsUnsynced();
+      SyncService().syncData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Resync started'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     }
   }

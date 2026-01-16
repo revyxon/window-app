@@ -94,17 +94,17 @@ class _ToastWidgetState extends State<_ToastWidget>
                 ),
                 decoration: BoxDecoration(
                   color: (widget.isError ? Colors.red : Colors.black)
-                      .withOpacity(0.8),
+                      .withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 16,
                       offset: const Offset(0, 4),
                     ),
                   ],
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.1),
                     width: 0.5,
                   ),
                 ),

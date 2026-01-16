@@ -1,11 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/license_service.dart';
 import '../services/update_service.dart';
-import '../models/user_controls.dart';
+import '../services/app_logger.dart';
+import '../services/log_service.dart';
+
 import '../screens/locked_screen.dart';
-import '../screens/update_screen.dart';
+
 import '../screens/offline_lock_screen.dart';
 
+/// SystemGuard V2: Invisible License Check with 7-Day Grace Period
 class SystemGuard extends StatefulWidget {
   final Widget child;
 
@@ -15,141 +19,137 @@ class SystemGuard extends StatefulWidget {
   State<SystemGuard> createState() => _SystemGuardState();
 }
 
-class _SystemGuardState extends State<SystemGuard> {
-  bool _isChecking = true;
-  LicenseStatus? _licenseStatus;
-  UpdateCheckResult? _updateResult;
-  bool _isOfflineLocked = false;
-  bool _skippedUpdate = false;
+class _SystemGuardState extends State<SystemGuard> with WidgetsBindingObserver {
+  bool _isLocked = false;
+  bool _isGracePeriodExpired = false; // "Offline Locked"
+  LicenseStatus? _status;
+
+  Timer? _validationTimer;
 
   @override
   void initState() {
     super.initState();
-    _performSystemCheck();
 
-    // Listen for real-time license changes
+    // 1. Initial State Load (Sync, Fast)
+    final service = LicenseService();
+    _status = service.status;
+
+    // Check if we are ALREADY locked from previous known state
+    if (service.isLocked) {
+      _isLocked = true;
+    }
+    // If not locked by server, check grace period
+    else if (!service.isSessionValid && service.status.isActive) {
+      // If grace period (7 days) expired, we allow 15s attempt to reconnec.
+      // But we don't lock INSTANTLY on startup because we want to give chance to re-validate.
+      // Unless it's vastly expired? For UX, we let them see the app for 15s, then lock if still offline.
+    }
+
+    // 2. Schedule Invisible Check (15s delay)
+    // Runs after app has fully loaded and user is interacting
+    _validationTimer = Timer(const Duration(seconds: 15), _runInvisibleCheck);
+
+    // 3. Listen for real-time changes
     LicenseService().addListener(_onLicenseChanged);
+
+    // 4. Lifecycle Observer
+    WidgetsBinding.instance.addObserver(this);
+
+    // 5. Log App Started
+    LogService().logEvent(
+      'APP_STARTED',
+      details: {'timestamp': DateTime.now().toIso8601String()},
+    );
   }
 
   @override
   void dispose() {
+    _validationTimer?.cancel();
     LicenseService().removeListener(_onLicenseChanged);
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  void _onLicenseChanged(LicenseStatus status) {
-    setState(() {
-      _licenseStatus = status;
-    });
-  }
-
-  Future<void> _performSystemCheck() async {
-    setState(() {
-      _isChecking = true;
-      _isOfflineLocked = false;
-    });
-
-    try {
-      // 1. Check License & Updates in parallel for speed
-      final results = await Future.wait([
-        LicenseService().checkStatus(),
-        UpdateService().checkForUpdate(),
-      ]);
-
-      final LicenseStatus license = results[0] as LicenseStatus;
-      final UpdateCheckResult update = results[1] as UpdateCheckResult;
-
-      // Check if we failed to get status AND we've been offline too long (> 24h)
-      final lastCheckTime = LicenseService().lastCheckTime;
-      bool isStale =
-          lastCheckTime == null ||
-          DateTime.now().difference(lastCheckTime).inHours >= 24;
-
-      // If we are offline (failed to fetch) AND status is stale, we LOCK.
-      // Note: checkStatus() returns cached if offline.
-      // We need a more explicit 'didFetchSucceed' check ideally, but for now:
-      // If we couldn't get update info (hasUpdate is false but no error),
-      // or if checkForUpdate threw an error.
-
-      bool fetchFailed = update.error != null;
-
-      setState(() {
-        _licenseStatus = license;
-        _updateResult = update;
-        _isOfflineLocked = fetchFailed && isStale;
-        _isChecking = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isChecking = false;
-        _isOfflineLocked = true;
-      });
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      LogService().logEvent('APP_PAUSED');
+    } else if (state == AppLifecycleState.resumed) {
+      LogService().logEvent('APP_RESUMED');
+    } else if (state == AppLifecycleState.detached) {
+      LogService().logEvent('APP_TERMINATED');
     }
   }
 
-  void _onSkipUpdate() {
-    if (_updateResult?.version != null) {
-      UpdateService().skipUpdate(_updateResult!.version!);
+  void _onLicenseChanged(LicenseStatus status) {
+    if (!mounted) return;
+
+    setState(() {
+      _status = status;
+      if (status.isLocked) {
+        _isLocked = true;
+      }
+    });
+  }
+
+  Future<void> _runInvisibleCheck() async {
+    AppLogger().info('GUARD', 'Running invisible validation (15s triggered)');
+
+    // Check Update first (optional, silent)
+    UpdateService().checkForUpdate();
+
+    // Validate License
+    await LicenseService().validate();
+
+    // After validation, check if we need to lock due to GRACE PERIOD expiration
+    if (!mounted) return;
+
+    final service = LicenseService();
+
+    // If we are NOT locked by server, but 7-Day Grace Period is over
+    if (!service.isLocked && !service.isSessionValid) {
       setState(() {
-        _skippedUpdate = true;
+        // This means: Offline > 7 days AND re-check failed.
+        _isGracePeriodExpired = true;
       });
+    } else {
+      // If valid, clear any temporary lock
+      if (_isGracePeriodExpired) {
+        setState(() {
+          _isGracePeriodExpired = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isChecking) {
-      return const Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(color: Colors.black),
-              SizedBox(height: 24),
-              Text(
-                'Securing System...',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // 1. Priority: Offline Lock (Cannot verify status)
-    if (_isOfflineLocked) {
-      return OfflineLockScreen(onRetry: _performSystemCheck);
-    }
-
-    // 2. Priority: Administrative Lock
-    if (_licenseStatus?.isLocked == true) {
+    // 1. Priority: Server Lock (Explicit 'Locked' status)
+    if (_isLocked && _status != null) {
       return LockedScreen(
-        reason: _licenseStatus?.lockReason,
-        onRetry: _performSystemCheck,
+        reason: _status!.lockReason,
+        onRetry: () async {
+          await LicenseService().validate();
+          setState(() {
+            _isLocked = LicenseService().isLocked;
+          });
+        },
       );
     }
 
-    // 3. Priority: Mandatory Update
-    if (_updateResult?.hasUpdate == true &&
-        _updateResult?.isMandatory == true &&
-        !_skippedUpdate) {
-      return UpdateScreen(
-        updateResult: _updateResult!,
-        // No onSkip provided means it's mandatory (button won't show)
+    // 2. Priority: Grace Period Expired (Offline > 7 Days)
+    if (_isGracePeriodExpired) {
+      return OfflineLockScreen(
+        onRetry: () async {
+          await LicenseService().validate();
+          setState(() {
+            _isGracePeriodExpired = !LicenseService().isSessionValid;
+          });
+        },
       );
     }
 
-    // 4. Low Priority: Optional Update (show as child)
-    // We actually want to show the UpdateScreen if an update is available even if not mandatory,
-    // but allow skipping.
-    if (_updateResult?.hasUpdate == true && !_skippedUpdate) {
-      return UpdateScreen(updateResult: _updateResult!, onSkip: _onSkipUpdate);
-    }
-
-    // 5. System clear
+    // 3. Render App (Invisible Guard)
     return widget.child;
   }
 }

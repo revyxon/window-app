@@ -1,3 +1,5 @@
+import '../utils/window_calculator.dart';
+
 class Window {
   final String? id;
   final String? userId;
@@ -6,12 +8,12 @@ class Window {
   final double width;
   final double height;
   final String type; // e.g., '3T', '2T', 'LC', 'FIX'
-  
+
   // New fields for L-Corner and Custom types
   final double? width2; // Second width for L-Corner
   final String? formula; // 'A' or 'B' for calculation logic
   final String? customName; // For 'Custom' type
-  
+
   final int quantity;
   final bool isOnHold;
   final String? notes;
@@ -42,25 +44,32 @@ class Window {
 
   // Calculated property for SqFt
   double get sqFt {
-    // Standard divisor for most calculations
-    const double divisor = 92903.04; 
-    
-    // L-Corner Logic
-    if (type == 'LC' || type == 'L-Corner') {
-       if (width2 == null) return 0.0;
-       
-       if (formula == 'A') {
-         // Formula A: (W1 + W2) * H / 90903
-         // Note: User specified 90903 for this formula
-         return ((width + width2!) * height) / 90903.0; 
-       } else {
-         // Formula B: (W1 * H) + (W2 * H) -> divided by standard divisor to get sqft
-         return ((width * height) + (width2! * height)) / divisor;
-       }
+    // Basic fields are required
+    if (width2 != null && (type == 'LC' || type == 'L-Corner')) {
+      // L-Corner Logic
+      return WindowCalculator.calculateDisplayedSqFt(
+        width: width,
+        height: height,
+        quantity: 1.0, // Model sqFt is usually per unit or total?
+        // Wait, the getter in original code was: ((width + width2!) * height) / 90903.0;
+        // It didn't multiply by quantity.
+        // But the WindowInputScreen multiplies by quantity.
+        // Let's check original getter again.
+        // Original: return ((width + width2!) * height) / 90903.0;
+        // It does NOT multiply by quantity. Use quantity=1.
+        width2: width2!,
+        type: type,
+        isFormulaA: formula == 'A' || formula == null,
+      );
     }
-    
+
     // Standard Calculation
-    return (width * height) / divisor; 
+    return WindowCalculator.calculateDisplayedSqFt(
+      width: width,
+      height: height,
+      quantity: 1.0,
+      type: type,
+    );
   }
 
   Map<String, dynamic> toMap() {
@@ -101,7 +110,9 @@ class Window {
       isOnHold: map['is_on_hold'] == 1 || map['is_on_hold'] == true,
       notes: map['notes'],
       createdAt: DateTime.tryParse(map['created_at'] ?? '') ?? DateTime.now(),
-      updatedAt: map['updated_at'] != null ? DateTime.tryParse(map['updated_at']) : null,
+      updatedAt: map['updated_at'] != null
+          ? DateTime.tryParse(map['updated_at'])
+          : null,
       syncStatus: map['sync_status'] as int? ?? 1,
       isDeleted: map['is_deleted'] == 1 || map['is_deleted'] == true,
     );

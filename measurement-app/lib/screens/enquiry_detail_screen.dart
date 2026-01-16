@@ -284,7 +284,7 @@ class _EnquiryDetailScreenState extends State<EnquiryDetailScreen> {
                         decoration: BoxDecoration(
                           color: _getStatusColor(
                             _currentStatus,
-                          ).withOpacity(0.1),
+                          ).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -307,9 +307,11 @@ class _EnquiryDetailScreenState extends State<EnquiryDetailScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
+                        color: Colors.blue.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                        border: Border.all(
+                          color: Colors.blue.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -501,7 +503,7 @@ class _EnquiryDetailScreenState extends State<EnquiryDetailScreen> {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: color.withOpacity(0.3),
+                    color: color.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),

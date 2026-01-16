@@ -8,11 +8,11 @@ class SettingsProvider with ChangeNotifier {
   static const String _lCornerFormulaKey = 'l_corner_formula';
   static const String _actualFormulaKey = 'actual_formula';
 
-  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode _themeMode = ThemeMode.light;
   double _textScale = 1.0;
   double _displayedFormula = 90903.0; // W × H ÷ this = displayed sqft
   String _lCornerFormula = 'A'; // 'A' or 'B'
-  double _actualFormula = 92903.04;   // W × H ÷ this = actual sqft
+  double _actualFormula = 92903.04; // W × H ÷ this = actual sqft
 
   ThemeMode get themeMode => _themeMode;
   double get textScale => _textScale;
@@ -24,15 +24,15 @@ class SettingsProvider with ChangeNotifier {
 
   Future<void> loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     final themeIndex = prefs.getInt(_themeKey) ?? 0;
     _themeMode = ThemeMode.values[themeIndex];
-    
+
     _textScale = prefs.getDouble(_textScaleKey) ?? 1.0;
     _displayedFormula = prefs.getDouble(_displayedFormulaKey) ?? 90903.0;
     _lCornerFormula = prefs.getString(_lCornerFormulaKey) ?? 'A';
     _actualFormula = prefs.getDouble(_actualFormulaKey) ?? 92903.04;
-    
+
     notifyListeners();
   }
 
@@ -86,13 +86,13 @@ class SettingsProvider with ChangeNotifier {
     await prefs.remove(_displayedFormulaKey);
     await prefs.remove(_lCornerFormulaKey);
     await prefs.remove(_actualFormulaKey);
-    
-    _themeMode = ThemeMode.system;
+
+    _themeMode = ThemeMode.light;
     _textScale = 1.0;
     _displayedFormula = 90903.0;
     _lCornerFormula = 'A';
     _actualFormula = 92903.04;
-    
+
     notifyListeners();
   }
 }

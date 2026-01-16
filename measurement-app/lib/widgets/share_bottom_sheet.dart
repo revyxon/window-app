@@ -116,10 +116,10 @@ class ShareBottomSheet extends StatelessWidget {
       if (await canLaunchUrl(url)) {
         await launchUrl(url);
       } else {
-        await Share.share(text);
+        await SharePlus.instance.share(ShareParams(text: text));
       }
     } else {
-      await Share.share(text);
+      await SharePlus.instance.share(ShareParams(text: text));
     }
     if (context.mounted) Navigator.pop(context);
   }

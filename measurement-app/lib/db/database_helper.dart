@@ -751,11 +751,61 @@ class DatabaseHelper {
     return result.map((json) => Window.fromMap(json)).toList();
   }
 
-  // Get unsynced (dirty) enquiries
-  Future<List<Enquiry>> getUnsyncedEnquiries() async {
+  // ==================== Remote Sync Upserts ====================
+
+  Future<void> upsertCustomerFromRemote(Map<String, dynamic> data) async {
     final db = await instance.database;
-    final result = await db.query('enquiries', where: 'sync_status != 0');
-    return result.map((json) => Enquiry.fromMap(json)).toList();
+    // status=0 indicates it's synced from server
+    data['sync_status'] = 0;
+    // Ensure boolean fields are 0/1 ints for SQLite
+    if (data['is_deleted'] is bool)
+      data['is_deleted'] = data['is_deleted'] ? 1 : 0;
+    if (data['is_final_measurement'] is bool)
+      data['is_final_measurement'] = data['is_final_measurement'] ? 1 : 0;
+
+    await db.insert(
+      'customers',
+      data,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> upsertWindowFromRemote(Map<String, dynamic> data) async {
+    final db = await instance.database;
+    data['sync_status'] = 0;
+    if (data['is_deleted'] is bool)
+      data['is_deleted'] = data['is_deleted'] ? 1 : 0;
+    if (data['is_on_hold'] is bool)
+      data['is_on_hold'] = data['is_on_hold'] ? 1 : 0;
+
+    await db.insert(
+      'windows',
+      data,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> upsertEnquiryFromRemote(Map<String, dynamic> data) async {
+    final db = await instance.database;
+    data['sync_status'] = 0;
+    if (data['is_deleted'] is bool)
+      data['is_deleted'] = data['is_deleted'] ? 1 : 0;
+
+    await db.insert(
+      'enquiries',
+      data,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> markAllAsUnsynced() async {
+    final db = await instance.database;
+    // Set all to Created(1) or Updated(2)?
+    // Setting to Updated(2) ensures they get pushed.
+    await db.update('customers', {'sync_status': 2});
+    await db.update('windows', {'sync_status': 2});
+    await db.update('enquiries', {'sync_status': 2});
+    await _logger.info('DB', 'Marked all data as unsynced (Force Push mode)');
   }
 
   // Mark as synced
@@ -800,20 +850,56 @@ class DatabaseHelper {
     );
   }
 
+  // ==================== Activity Log Operations ====================
+
+  Future<ActivityLog> createActivityLog(ActivityLog log) async {
+    final db = await instance.database;
+    final map = log.toMap();
+
+    if (map['id'] == null) {
+      map['id'] = const Uuid().v4();
+    }
+    map['sync_status'] = 1; // Created
+
+    await db.insert('activity_logs', map);
+    return ActivityLog.fromMap(map);
+  }
+
+  Future<List<ActivityLog>> getUnsyncedActivityLogs() async {
+    final db = await instance.database;
+    final result = await db.query(
+      'activity_logs',
+      where: 'sync_status != 0',
+      orderBy: 'timestamp ASC',
+    );
+    return result.map((json) => ActivityLog.fromMap(json)).toList();
+  }
+
+  Future<void> markActivityLogsSynced(List<String> ids) async {
+    if (ids.isEmpty) return;
+
+    final db = await instance.database;
+    final placeholders = List.filled(ids.length, '?').join(',');
+    await db.rawUpdate(
+      'UPDATE activity_logs SET sync_status = 0 WHERE id IN ($placeholders)',
+      ids,
+    );
+  }
+
+  Future<int> cleanOldActivityLogs() async {
+    final db = await instance.database;
+    final cutoff = DateTime.now().subtract(const Duration(days: 7));
+    return await db.delete(
+      'activity_logs',
+      where: 'sync_status = 0 AND timestamp < ?',
+      whereArgs: [cutoff.toIso8601String()],
+    );
+  }
+
   // Clean deleted items that are synced
   Future<void> cleanSyncedDeletes() async {
     await _logger.debug('DB', 'cleanSyncedDeletes starting...');
     final db = await instance.database;
-
-    // Log BEFORE deleting
-    final beforeWindows = await db.rawQuery(
-      'SELECT COUNT(*) as cnt FROM windows',
-    );
-    await _logger.debug(
-      'DB',
-      'Before cleanup',
-      'total windows=${beforeWindows.first['cnt']}',
-    );
 
     final windowsDeleted = await db.delete(
       'windows',
@@ -828,209 +914,25 @@ class DatabaseHelper {
       where: 'is_deleted = 1 AND sync_status = 0',
     );
 
-    // Log AFTER deleting
-    final afterWindows = await db.rawQuery(
-      'SELECT COUNT(*) as cnt FROM windows',
-    );
     await _logger.info(
       'DB',
       'cleanSyncedDeletes completed',
-      'windowsDeleted=$windowsDeleted, customersDeleted=$customersDeleted, enquiriesDeleted=$enquiriesDeleted, remainingWindows=${afterWindows.first['cnt']}',
+      'windowsDeleted=$windowsDeleted, customersDeleted=$customersDeleted, enquiriesDeleted=$enquiriesDeleted',
     );
   }
 
-  // Force all data to be dirty (for migration)
-  Future<void> markAllAsUnsynced() async {
+  // Get unsynced enquiries
+  Future<List<Enquiry>> getUnsyncedEnquiries() async {
     final db = await instance.database;
-    // Set all Synced(0) to Updated(2)
-    await db.update('customers', {'sync_status': 2}, where: 'sync_status = 0');
-    await db.update('windows', {'sync_status': 2}, where: 'sync_status = 0');
-    await db.update('enquiries', {'sync_status': 2}, where: 'sync_status = 0');
+    final result = await db.query('enquiries', where: 'sync_status != 0');
+    return result.map((json) => Enquiry.fromMap(json)).toList();
   }
 
-  // Upsert from Remote (Sync Pull)
-  Future<void> upsertCustomerFromRemote(Map<String, dynamic> remoteData) async {
-    await _logger.debug(
-      'DB',
-      'upsertCustomerFromRemote',
-      'id=${remoteData['id']}, is_deleted=${remoteData['is_deleted']}',
-    );
-
-    final db = await instance.database;
-    final id = remoteData['id'];
-
-    // 1. Skip if remote customer is marked as deleted
-    // This prevents syncing a "deleted" state effectively if we want to keep history?
-    // No, if remote says deleted, we should mark local as deleted.
-    // BUT the previous logic was skipping it. Let's stick to the behavior:
-    // If incoming is deleted, we mark local as deleted.
-
-    final isDeleted =
-        remoteData['is_deleted'] == 1 || remoteData['is_deleted'] == true;
-
-    if (isDeleted) {
-      // Incoming is deleted. Mark local as deleted.
-      await _logger.info(
-        'DB',
-        'Remote says deleted. Marking local as deleted.',
-        'id=$id',
-      );
-      // We do NOT hard delete here to be safe, just soft delete.
-      // Although if we truly want to sync deletions...
-      await db.update(
-        'customers',
-        {'is_deleted': 1, 'sync_status': 0}, // Synced because it matches remote
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-      // Also cascade soft delete windows?
-      // Ideally yes, but let's stick to core customer record first.
-      return;
-    }
-
-    try {
-      // SAFE UPSERT: Check existence first
-      final existing = await db.query(
-        'customers',
-        columns: ['id'],
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-
-      if (existing.isNotEmpty) {
-        // UPDATE
-        await db.update(
-          'customers',
-          remoteData,
-          where: 'id = ?',
-          whereArgs: [id],
-        );
-        await _logger.info('DB', 'Updated existing customer', 'id=$id');
-      } else {
-        // INSERT
-        await db.insert('customers', remoteData);
-        await _logger.info('DB', 'Inserted new customer', 'id=$id');
-      }
-    } catch (e) {
-      await _logger.error('DB', 'upsertCustomerFromRemote FAILED', 'error=$e');
-    }
-  }
-
-  Future<void> upsertEnquiryFromRemote(Map<String, dynamic> remoteData) async {
-    final db = await instance.database;
-    final id = remoteData['id'];
-
-    final isDeleted =
-        remoteData['is_deleted'] == 1 || remoteData['is_deleted'] == true;
-
-    if (isDeleted) {
-      await db.update(
-        'enquiries',
-        {'is_deleted': 1, 'sync_status': 0},
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-      return;
-    }
-
-    try {
-      final existing = await db.query(
-        'enquiries',
-        columns: ['id'],
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-
-      if (existing.isNotEmpty) {
-        await db.update(
-          'enquiries',
-          remoteData,
-          where: 'id = ?',
-          whereArgs: [id],
-        );
-      } else {
-        await db.insert('enquiries', remoteData);
-      }
-    } catch (e) {
-      await _logger.error('DB', 'upsertEnquiryFromRemote FAILED', 'error=$e');
-    }
-  }
-
-  Future<void> upsertWindowFromRemote(Map<String, dynamic> remoteData) async {
-    // await _logger.debug('DB', 'upsertWindowFromRemote', 'data=$remoteData');
-    final db = await instance.database;
-    final id = remoteData['id'];
-
-    try {
-      // SAFE UPSERT
-      final existing = await db.query(
-        'windows',
-        columns: ['id'],
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-
-      if (existing.isNotEmpty) {
-        // UPDATE
-        await db.update(
-          'windows',
-          remoteData,
-          where: 'id = ?',
-          whereArgs: [id],
-        );
-        // await _logger.info('DB', 'Updated existing window', 'id=$id');
-      } else {
-        // INSERT
-        await db.insert('windows', remoteData);
-        await _logger.info('DB', 'Inserted new window', 'id=$id');
-      }
-    } catch (e) {
-      await _logger.error(
-        'DB',
-        'upsertWindowFromRemote FAILED',
-        'error=$e, data=$remoteData',
-      );
-    }
-  }
+  // No changes needed here, just removing the duplicates that follow.
 
   // ==================== Activity Log Operations ====================
 
-  /// Create a new activity log entry
-  Future<ActivityLog> createActivityLog(ActivityLog log) async {
-    final db = await instance.database;
-    final map = log.toMap();
-
-    if (map['id'] == null) {
-      map['id'] = const Uuid().v4();
-    }
-    map['sync_status'] = 1; // Created
-
-    await db.insert('activity_logs', map);
-    return ActivityLog.fromMap(map);
-  }
-
-  /// Get all unsynced activity logs
-  Future<List<ActivityLog>> getUnsyncedActivityLogs() async {
-    final db = await instance.database;
-    final result = await db.query(
-      'activity_logs',
-      where: 'sync_status != 0',
-      orderBy: 'timestamp ASC',
-    );
-    return result.map((json) => ActivityLog.fromMap(json)).toList();
-  }
-
-  /// Mark activity logs as synced
-  Future<void> markActivityLogsSynced(List<String> ids) async {
-    if (ids.isEmpty) return;
-
-    final db = await instance.database;
-    final placeholders = List.filled(ids.length, '?').join(',');
-    await db.rawUpdate(
-      'UPDATE activity_logs SET sync_status = 0 WHERE id IN ($placeholders)',
-      ids,
-    );
-  }
+  // Activity Log deduplicated above.
 
   /// Get recent activity logs for display
   Future<List<ActivityLog>> getRecentActivityLogs({int limit = 100}) async {
@@ -1052,16 +954,7 @@ class DatabaseHelper {
     return result.first['cnt'] as int? ?? 0;
   }
 
-  /// Clean old activity logs (older than 7 days that are synced)
-  Future<int> cleanOldActivityLogs() async {
-    final db = await instance.database;
-    final cutoff = DateTime.now().subtract(const Duration(days: 7));
-    return await db.delete(
-      'activity_logs',
-      where: 'sync_status = 0 AND timestamp < ?',
-      whereArgs: [cutoff.toIso8601String()],
-    );
-  }
+  // Deduped above.
 
   // ==================== Utils ====================
 

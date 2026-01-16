@@ -123,9 +123,9 @@ class _MainScreenState extends State<MainScreen>
         onDestinationSelected: _onItemTapped,
         backgroundColor: Colors.white,
         elevation: 4,
-        shadowColor: Colors.black.withOpacity(0.1),
+        shadowColor: Colors.black.withValues(alpha: 0.1),
         surfaceTintColor: Colors.white,
-        indicatorColor: AppColors.primary.withOpacity(0.15),
+        indicatorColor: AppColors.primary.withValues(alpha: 0.15),
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.square_foot_outlined),
@@ -190,7 +190,7 @@ class _MainScreenState extends State<MainScreen>
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -232,7 +232,7 @@ class _MainScreenState extends State<MainScreen>
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),

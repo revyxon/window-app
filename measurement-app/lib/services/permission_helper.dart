@@ -14,7 +14,9 @@ class PermissionHelper {
     String action,
     String actionName,
   ) {
-    if (!LicenseService().canPerform(action)) {
+    // We now only check if the system is locked globally
+    // We ignore the specific 'action' parameter as all actions are allowed if active
+    if (LicenseService().isLocked) {
       _showBlockedDialog(context, actionName);
       return false;
     }
@@ -23,7 +25,8 @@ class PermissionHelper {
 
   /// Check if action is allowed (silent check)
   bool canPerform(String action) {
-    return LicenseService().canPerform(action);
+    // All actions allowed if not locked
+    return !LicenseService().isLocked;
   }
 
   /// Show blocked action dialog

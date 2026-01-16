@@ -59,11 +59,13 @@ class PrintService {
     final file = File('${output.path}/$fileName');
     await file.writeAsBytes(pdfBytes);
 
-    // Share using CrossFile (XFile)
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      subject: '$name - ${customer.name}',
-      text: 'Please find attached the $name for ${customer.name}.',
+    // Share using SharePlus
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path)],
+        subject: '$name - ${customer.name}',
+        text: 'Please find attached the $name for ${customer.name}.',
+      ),
     );
   }
 }

@@ -62,9 +62,8 @@ class UpdateService {
         isMandatory: isForceUpdate || !skipAllowed,
         skipCount: skipCount,
       );
-    } catch (e) {
-      print('UpdateService Error: $e');
-      return UpdateCheckResult(hasUpdate: false, error: e.toString());
+    } catch (_) {
+      return UpdateCheckResult(hasUpdate: false);
     }
   }
 

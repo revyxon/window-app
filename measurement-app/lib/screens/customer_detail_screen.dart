@@ -6,6 +6,7 @@ import '../models/customer.dart';
 import '../models/window.dart';
 import '../providers/app_provider.dart';
 import 'window_input_screen.dart';
+import '../utils/window_calculator.dart';
 import '../widgets/share_bottom_sheet.dart';
 import '../widgets/print_bottom_sheet.dart';
 import '../utils/haptics.dart';
@@ -189,15 +190,33 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
             final windows = snapshot.data ?? [];
             final totalQty = windows.fold(0, (sum, w) => sum + w.quantity);
 
-            // Displayed sqft: W × H ÷ 90,903 (user's formula)
+            // Displayed sqft
             final displayedSqFt = windows.fold(
               0.0,
-              (sum, w) => sum + (w.width * w.height / 90903.0 * w.quantity),
+              (sum, w) =>
+                  sum +
+                  WindowCalculator.calculateDisplayedSqFt(
+                    width: w.width,
+                    height: w.height,
+                    quantity: w.quantity.toDouble(),
+                    width2: w.width2 ?? 0,
+                    type: w.type,
+                    isFormulaA: w.formula == 'A' || w.formula == null,
+                  ),
             );
-            // Actual sqft: W × H ÷ 92,903.04 (real formula)
+            // Actual sqft
             final actualSqFt = windows.fold(
               0.0,
-              (sum, w) => sum + (w.width * w.height / 92903.04 * w.quantity),
+              (sum, w) =>
+                  sum +
+                  WindowCalculator.calculateActualSqFt(
+                    width: w.width,
+                    height: w.height,
+                    quantity: w.quantity.toDouble(),
+                    width2: w.width2 ?? 0,
+                    type: w.type,
+                    isFormulaA: w.formula == 'A' || w.formula == null,
+                  ),
             );
 
             final avgPerWindow = windows.isNotEmpty

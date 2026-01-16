@@ -1,86 +1,69 @@
-// Device types
 export interface Device {
     deviceId: string;
-    status: 'active' | 'locked' | 'expired';
-    licenseExpiry?: string;
-    registeredAt: string;
-    lastActiveAt: string;
-    appVersion?: string;
-    updateSkipCount?: number;
-    lastSkippedVersion?: string;
+    status: 'active' | 'locked' | 'expired' | 'unregistered';
+    registeredAt: string | null;
+    lastActiveAt: string | null;
+    appVersion: string | null;
+    licenseExpiry: string | null;
+    deviceInfo?: Record<string, any>;
+    lockReason?: string;
+    // New fields for Unified Overhaul
+    forceCheck?: boolean;
+    lastValidCheck?: string | null;
+    graceStatus?: 'active' | 'grace_period' | 'expired';
 }
 
-// License check response
-export interface LicenseResponse {
-    isValid: boolean;
-    status: string;
-    message?: string;
-    expiresAt?: string;
-}
-
-// Activity log entry
-export interface ActivityLog {
+export interface UpdateRelease {
     id: string;
-    deviceId: string;
-    actionName: string;
-    page: string;
-    context?: string;
-    timestamp: string;
-}
-
-// Customer
-export interface Customer {
-    id: string;
-    deviceId: string;
-    name: string;
-    location: string;
-    phone?: string;
-    framework: string;
-    glassType?: string;
-    ratePerSqft?: number;
-    isFinalMeasurement: boolean;
-    createdAt: string;
-    updatedAt?: string;
-    isDeleted: boolean;
-}
-
-// Window
-export interface Window {
-    id: string;
-    deviceId: string;
-    customerId: string;
-    name: string;
-    width: number;
-    height: number;
-    type: string;
-    width2?: number;
-    formula?: string;
-    customName?: string;
-    quantity: number;
-    isOnHold: boolean;
-    notes?: string;
-    createdAt: string;
-    updatedAt?: string;
-    isDeleted: boolean;
-}
-
-// App update
-export interface AppUpdate {
     version: string;
     buildNumber: number;
     apkUrl: string;
     fileSize: number;
-    releaseNotes?: string;
+    releaseNotes: string | null;
     forceUpdate: boolean;
     skipAllowed: boolean;
-    createdAt: string;
+    createdAt: string | null;
 }
 
-// Admin analytics
-export interface Analytics {
-    totalDevices: number;
-    activeToday: number;
-    totalCustomers: number;
-    totalWindows: number;
-    recentActivity: ActivityLog[];
+export interface LicenseResponse {
+    isValid: boolean;
+    status: string;
+    message?: string;
+    expiresAt?: string | null;
+}
+
+export interface Customer {
+    id: string;
+    name: string;
+    phone: string;
+    email?: string;
+    address?: string;
+    city?: string;
+    deviceId: string;
+    updatedAt: string | null;
+    isDeleted?: boolean;
+}
+
+export interface Measurement {
+    id: string;
+    name: string;
+    width: number;
+    height: number;
+    quantity: number;
+    glassType?: string;
+    customerId: string;
+    deviceId: string;
+    updatedAt: string | null;
+    isDeleted?: boolean;
+}
+
+export interface Enquiry {
+    id: string;
+    customerName: string;
+    phone: string;
+    message: string;
+    status: string;
+    deviceId: string;
+    date: string | null;
+    isDeleted?: boolean;
 }

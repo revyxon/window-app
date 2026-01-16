@@ -84,44 +84,48 @@ class AppTheme {
   }
 
   static ThemeData get darkTheme {
-    const darkBackground = Color(0xFF121212);
-    const darkSurface = Color(0xFF1E1E1E);
-    const darkCard = Color(0xFF252525);
-    const darkBorder = Color(0xFF3A3A3A);
-    const darkTextPrimary = Color(0xFFE5E5E5);
-    const darkTextSecondary = Color(0xFF9CA3AF);
+    // Premium OLED Palette
+    const darkBackground = Color(0xFF000000); // Pure Black
+    const darkSurface = Color(0xFF1C1C1E); // iOS Dark Grey
+    const darkCard = Color(0xFF1C1C1E); // Card Surface
+    const darkBorder = Color(0xFF38383A); // Subtle Border
+    const darkTextPrimary = Color(0xFFFFFFFF); // High Emphasis
+    const darkTextSecondary = Color(0xFF8E8E93); // Medium Emphasis
+    const primaryColor = AppColors.primary;
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: darkBackground,
       colorScheme: ColorScheme.dark(
-        primary: AppColors.primary,
+        primary: primaryColor,
         surface: darkSurface,
         onSurface: darkTextPrimary,
         error: Colors.redAccent,
         outline: darkBorder,
+        surfaceContainerHighest: Color(0xFF2C2C2E), // For dialogs/modals
       ),
       fontFamily: GoogleFonts.inter().fontFamily,
-      textTheme: GoogleFonts.interTextTheme().apply(
-        bodyColor: darkTextPrimary,
-        displayColor: darkTextPrimary,
-      ),
+      textTheme: GoogleFonts.interTextTheme(
+        ThemeData.dark().textTheme,
+      ).apply(bodyColor: darkTextPrimary, displayColor: darkTextPrimary),
       appBarTheme: const AppBarTheme(
         backgroundColor: darkBackground,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
+        centerTitle: false,
         titleTextStyle: TextStyle(
           color: darkTextPrimary,
           fontSize: 24,
           fontWeight: FontWeight.bold,
+          letterSpacing: -0.5,
         ),
         iconTheme: IconThemeData(color: darkTextPrimary),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: darkCard,
+        fillColor: darkSurface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: darkBorder),
@@ -132,17 +136,18 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          borderSide: const BorderSide(color: primaryColor, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16,
         ),
         hintStyle: const TextStyle(color: darkTextSecondary),
+        labelStyle: const TextStyle(color: darkTextSecondary),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor: primaryColor,
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
@@ -153,25 +158,46 @@ class AppTheme {
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: AppColors.primary,
+        backgroundColor: primaryColor,
         foregroundColor: Colors.white,
-        elevation: 4,
+        elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       cardTheme: CardThemeData(
         color: darkCard,
         elevation: 0,
+        margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: darkBorder),
+          borderRadius: BorderRadius.circular(16), // Softer corners
+          side: const BorderSide(color: darkBorder, width: 0.5),
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: darkSurface,
+        backgroundColor: Color(0xFF2C2C2E), // Lighter than background
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titleTextStyle: const TextStyle(
+          color: darkTextPrimary,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: darkSurface,
+        backgroundColor: Color(0xFF2C2C2E),
+        modalBackgroundColor: Color(0xFF2C2C2E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: darkBorder,
+        thickness: 0.5,
+        space: 1,
+      ),
+      iconTheme: const IconThemeData(color: darkTextPrimary),
+      listTileTheme: const ListTileThemeData(
+        iconColor: darkTextSecondary,
+        textColor: darkTextPrimary,
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {

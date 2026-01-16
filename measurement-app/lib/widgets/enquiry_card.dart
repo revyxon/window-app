@@ -28,13 +28,13 @@ class EnquiryCard extends StatelessWidget {
   Color _getStatusBgColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return Colors.orange.withOpacity(0.1);
+        return Colors.orange.withValues(alpha: 0.1);
       case 'converted':
-        return Colors.green.withOpacity(0.1);
+        return Colors.green.withValues(alpha: 0.1);
       case 'dismissed':
-        return Colors.grey.withOpacity(0.1);
+        return Colors.grey.withValues(alpha: 0.1);
       default:
-        return AppColors.primary.withOpacity(0.1);
+        return AppColors.primary.withValues(alpha: 0.1);
     }
   }
 

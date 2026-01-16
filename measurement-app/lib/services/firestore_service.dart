@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'device_id_service.dart';
 import 'device_info_service.dart';
@@ -32,13 +33,8 @@ class FirestoreService {
         if (customer['id'] == null) continue;
 
         final cleaned = Map<String, dynamic>.from(customer);
-        cleaned['deviceId'] =
-            deviceId; // Use deviceId instead of user_id for RLS/Filter
-        cleaned['updated_at'] =
-            FieldValue.serverTimestamp(); // Use server timestamp (snake_case to match DB but serialized to camelCase by Firestore? No, matches map key)
-        // wait, local DB uses snake_case 'updated_at'. serialized map keys are what we sent.
-        // let's ensure we use consistent keys.
-        // If local map has 'updated_at', and we write it to firestore, it's 'updated_at'.
+        cleaned['deviceId'] = deviceId;
+        cleaned['updated_at'] = FieldValue.serverTimestamp();
         cleaned.remove('sync_status');
 
         final docRef = _firestore.collection('customers').doc(customer['id']);
@@ -61,8 +57,7 @@ class FirestoreService {
           .get();
 
       return snapshot.docs.map((doc) => _processDocument(doc.data())).toList();
-    } catch (e) {
-      print('Firestore fetch customers error: $e');
+    } catch (_) {
       return [];
     }
   }
@@ -108,8 +103,7 @@ class FirestoreService {
           .get();
 
       return snapshot.docs.map((doc) => _processDocument(doc.data())).toList();
-    } catch (e) {
-      print('Firestore fetch windows error: $e');
+    } catch (_) {
       return [];
     }
   }
@@ -155,8 +149,7 @@ class FirestoreService {
           .get();
 
       return snapshot.docs.map((doc) => _processDocument(doc.data())).toList();
-    } catch (e) {
-      print('Firestore fetch enquiries error: $e');
+    } catch (_) {
       return [];
     }
   }
@@ -182,6 +175,26 @@ class FirestoreService {
         final cleaned = Map<String, dynamic>.from(log);
         cleaned['deviceId'] = deviceId;
         cleaned.remove('sync_status');
+
+        // PRO: Convert timestamp string to native Firestore Timestamp
+        if (cleaned['timestamp'] is String) {
+          final dt = DateTime.tryParse(cleaned['timestamp']);
+          if (dt != null) {
+            cleaned['timestamp'] = Timestamp.fromDate(dt);
+          }
+        }
+
+        // PRO: Convert context JSON string to Map for better visibility
+        if (cleaned['context'] is String) {
+          try {
+            cleaned['metadata'] = jsonDecode(cleaned['context']);
+            cleaned.remove(
+              'context',
+            ); // Use 'metadata' as the primary structured field
+          } catch (_) {
+            // Keep as is or ignore
+          }
+        }
 
         final docRef = _firestore.collection('activity_logs').doc(log['id']);
         batch.set(docRef, cleaned, SetOptions(merge: true));
@@ -209,7 +222,6 @@ class FirestoreService {
         'appVersion': appVersion,
         'deviceInfo': deviceInfo,
       });
-      print('FIRESTORE: New device registered with full info: $deviceId');
     } else {
       // Update last active and device info (may have changed after updates)
       await docRef.update({
@@ -229,8 +241,7 @@ class FirestoreService {
         return doc.data();
       }
       return null;
-    } catch (e) {
-      print('Firestore getDeviceStatus error: $e');
+    } catch (_) {
       return null;
     }
   }
@@ -241,9 +252,8 @@ class FirestoreService {
       await _firestore.collection('devices').doc(deviceId).update({
         'lastActiveAt': FieldValue.serverTimestamp(),
       });
-    } catch (e) {
+    } catch (_) {
       // Silently fail - device may not be registered yet
-      print('Firestore updateLastActive error: $e');
     }
   }
 
@@ -262,14 +272,13 @@ class FirestoreService {
       if (updates.isNotEmpty) {
         await _firestore.collection('devices').doc(deviceId).update(updates);
       }
-    } catch (e) {
-      print('Firestore updateUpdateSkipStatus error: $e');
+    } catch (_) {
+      // Silently fail
     }
   }
 
   Future<void> clearAllCloudData() async {
     final deviceId = await _getDeviceId();
-    print('FIRESTORE: Clearing all data for device: $deviceId');
 
     // 1. Delete all Windows
     final windows = await _firestore
@@ -283,7 +292,6 @@ class FirestoreService {
         batch.delete(doc.reference);
       }
       await batch.commit();
-      print('FIRESTORE: Deleted ${windows.docs.length} windows');
     }
 
     // 2. Delete all Customers
@@ -298,7 +306,6 @@ class FirestoreService {
         batch.delete(doc.reference);
       }
       await batch.commit();
-      print('FIRESTORE: Deleted ${customers.docs.length} customers');
     }
 
     // 3. Delete all Activity Logs
@@ -313,7 +320,6 @@ class FirestoreService {
         batch.delete(doc.reference);
       }
       await batch.commit();
-      print('FIRESTORE: Deleted ${activityLogs.docs.length} activity logs');
     }
 
     // 4. Delete all Enquiries
@@ -328,10 +334,7 @@ class FirestoreService {
         batch.delete(doc.reference);
       }
       await batch.commit();
-      print('FIRESTORE: Deleted ${enquiries.docs.length} enquiries');
     }
-
-    print('FIRESTORE: Cloud data cleared successfully.');
   }
 
   // Helper to convert Timestamp to String and normalize key names for local DB compatibility

@@ -5,8 +5,6 @@ import '../providers/app_provider.dart';
 import '../utils/app_colors.dart';
 import '../widgets/enquiry_card.dart';
 import 'enquiry_detail_screen.dart';
-import '../services/activity_log_service.dart';
-import '../models/activity_log.dart';
 import '../utils/fast_page_route.dart';
 
 class EnquiryListScreen extends StatefulWidget {
@@ -26,7 +24,7 @@ class _EnquiryListScreenState extends State<EnquiryListScreen> {
   @override
   void initState() {
     super.initState();
-    ActivityLogService().logScreenView(ScreenNames.home); // Using home for now
+    // Manual logScreenView removed as handled by LoggingNavigatorObserver
 
     Future.microtask(
       () => Provider.of<AppProvider>(context, listen: false).loadEnquiries(),

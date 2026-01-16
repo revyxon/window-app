@@ -3,6 +3,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../db/database_helper.dart';
 import 'firestore_service.dart';
+import 'app_logger.dart';
 
 class SyncService {
   static final SyncService _instance = SyncService._internal();
@@ -22,17 +23,19 @@ class SyncService {
     // Run one-time migration to force resync of old Supabase data
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getBool('migrated_to_firebase_reset_v3') != true) {
-      print('Running one-time data migration for Firebase...');
+      await AppLogger().info(
+        'SYNC',
+        'Running one-time data migration for Firebase',
+      );
       await DatabaseHelper.instance.markAllAsUnsynced();
       await prefs.setBool('migrated_to_firebase_reset_v3', true);
-      print('Migration complete. All data marked for sync.');
     }
 
     // Register device on first launch
     try {
       await FirestoreService().registerDevice(appVersion: '1.0.0');
     } catch (e) {
-      print('Device registration failed: $e');
+      await AppLogger().error('SYNC', 'Device registration failed: $e');
     }
 
     // Listen to network changes
@@ -94,16 +97,13 @@ class SyncService {
 
     // PUSH: Get dirty records and upload
     final dirtyCustomers = await db.getUnsyncedCustomers();
-    print('SYNC DEBUG: Found ${dirtyCustomers.length} dirty customers to push');
 
     if (dirtyCustomers.isNotEmpty) {
       final customersMap = dirtyCustomers.map((c) => c.toMap()).toList();
-      print('SYNC DEBUG: Pushing customers to Firestore...');
       try {
         await firestore.upsertCustomers(customersMap);
-        print('SYNC DEBUG: Customers pushed successfully!');
       } catch (e) {
-        print('SYNC DEBUG ERROR: Failed to push customers: $e');
+        await AppLogger().error('SYNC', 'Failed to push customers: $e');
         rethrow;
       }
 
@@ -116,24 +116,20 @@ class SyncService {
     }
 
     // PULL: Fetch from server (wrapped in try-catch to not block windows sync)
-    print('SYNC DEBUG: Pulling customers from Firestore...');
     try {
       final remoteCustomers = await firestore.fetchCustomers(
         since: DateTime.fromMillisecondsSinceEpoch(0),
-      );
-      print(
-        'SYNC DEBUG: Pulled ${remoteCustomers.length} customers from Firestore',
       );
 
       for (var remoteData in remoteCustomers) {
         try {
           await db.upsertCustomerFromRemote(remoteData);
         } catch (e) {
-          print('SYNC DEBUG ERROR: Failed to upsert customer: $e');
+          await AppLogger().error('SYNC', 'Failed to upsert customer: $e');
         }
       }
     } catch (e) {
-      print('SYNC DEBUG ERROR: Failed to pull customers: $e');
+      await AppLogger().error('SYNC', 'Failed to pull customers: $e');
     }
   }
 
@@ -143,16 +139,13 @@ class SyncService {
 
     // PUSH
     final dirtyWindows = await db.getUnsyncedWindows();
-    print('SYNC DEBUG: Found ${dirtyWindows.length} dirty windows to push');
 
     if (dirtyWindows.isNotEmpty) {
       final windowsMap = dirtyWindows.map((w) => w.toMap()).toList();
-      print('SYNC DEBUG: Pushing windows to Firestore...');
       try {
         await firestore.upsertWindows(windowsMap);
-        print('SYNC DEBUG: Windows pushed successfully!');
       } catch (e) {
-        print('SYNC DEBUG ERROR: Failed to push windows: $e');
+        await AppLogger().error('SYNC', 'Failed to push windows: $e');
         rethrow;
       }
 
@@ -164,24 +157,20 @@ class SyncService {
     }
 
     // PULL (wrapped in try-catch)
-    print('SYNC DEBUG: Pulling windows from Firestore...');
     try {
       final remoteWindows = await firestore.fetchWindows(
         since: DateTime.fromMillisecondsSinceEpoch(0),
-      );
-      print(
-        'SYNC DEBUG: Pulled ${remoteWindows.length} windows from Firestore',
       );
 
       for (var remoteData in remoteWindows) {
         try {
           await db.upsertWindowFromRemote(remoteData);
         } catch (e) {
-          print('SYNC DEBUG ERROR: Failed to upsert window: $e');
+          await AppLogger().error('SYNC', 'Failed to upsert window: $e');
         }
       }
     } catch (e) {
-      print('SYNC DEBUG ERROR: Failed to pull windows: $e');
+      await AppLogger().error('SYNC', 'Failed to pull windows: $e');
     }
 
     // Clean up deleted records that are synced
@@ -194,16 +183,13 @@ class SyncService {
 
     // PUSH
     final dirtyEnquiries = await db.getUnsyncedEnquiries();
-    print('SYNC DEBUG: Found ${dirtyEnquiries.length} dirty enquiries to push');
 
     if (dirtyEnquiries.isNotEmpty) {
       final enquiriesMap = dirtyEnquiries.map((e) => e.toMap()).toList();
-      print('SYNC DEBUG: Pushing enquiries to Firestore...');
       try {
         await firestore.upsertEnquiries(enquiriesMap);
-        print('SYNC DEBUG: Enquiries pushed successfully!');
       } catch (e) {
-        print('SYNC DEBUG ERROR: Failed to push enquiries: $e');
+        await AppLogger().error('SYNC', 'Failed to push enquiries: $e');
         rethrow;
       }
 
@@ -215,24 +201,20 @@ class SyncService {
     }
 
     // PULL
-    print('SYNC DEBUG: Pulling enquiries from Firestore...');
     try {
       final remoteEnquiries = await firestore.fetchEnquiries(
         since: DateTime.fromMillisecondsSinceEpoch(0),
-      );
-      print(
-        'SYNC DEBUG: Pulled ${remoteEnquiries.length} enquiries from Firestore',
       );
 
       for (var remoteData in remoteEnquiries) {
         try {
           await db.upsertEnquiryFromRemote(remoteData);
         } catch (e) {
-          print('SYNC DEBUG ERROR: Failed to upsert enquiry: $e');
+          await AppLogger().error('SYNC', 'Failed to upsert enquiry: $e');
         }
       }
     } catch (e) {
-      print('SYNC DEBUG ERROR: Failed to pull enquiries: $e');
+      await AppLogger().error('SYNC', 'Failed to pull enquiries: $e');
     }
   }
 
@@ -245,8 +227,6 @@ class SyncService {
       final unsyncedLogs = await db.getUnsyncedActivityLogs();
       if (unsyncedLogs.isEmpty) return;
 
-      print('SYNC: Found ${unsyncedLogs.length} activity logs to push');
-
       final logsMap = unsyncedLogs.map((l) => l.toMap()).toList();
       await firestore.upsertActivityLogs(logsMap);
 
@@ -254,13 +234,11 @@ class SyncService {
       final ids = unsyncedLogs.map((l) => l.id!).toList();
       await db.markActivityLogsSynced(ids);
 
-      print('SYNC: Activity logs pushed successfully!');
-
       // Clean old synced logs to save space
       await db.cleanOldActivityLogs();
     } catch (e) {
       // Don't rethrow - activity log sync failure shouldn't block other syncs
-      print('SYNC ERROR: Failed to sync activity logs: $e');
+      await AppLogger().error('SYNC', 'Failed to sync activity logs: $e');
     }
   }
 
@@ -268,7 +246,7 @@ class SyncService {
     try {
       await FirestoreService().clearAllCloudData();
     } catch (e) {
-      print('SYNC: Failed to clear cloud data: $e');
+      await AppLogger().error('SYNC', 'Failed to clear cloud data: $e');
       rethrow;
     }
   }

@@ -11,6 +11,9 @@ class WindowType {
     this.isCustom = false,
   });
 
+  static const String lCorner = 'LC';
+  static const String custom = 'CUST';
+
   static const List<WindowType> all = [
     WindowType(code: '3T', name: '3 Track Window'),
     WindowType(code: '2T', name: '2 Track Window'),
@@ -25,10 +28,13 @@ class WindowType {
   ];
 
   static String getName(String code) {
-    if (code == 'CUST') return 'Custom Window'; // Or handle dynamically if customName is stored elsewhere
-    return all.firstWhere(
-      (t) => t.code == code,
-      orElse: () => WindowType(code: code, name: code),
-    ).name;
+    if (code == 'CUST')
+      return 'Custom Window'; // Or handle dynamically if customName is stored elsewhere
+    return all
+        .firstWhere(
+          (t) => t.code == code,
+          orElse: () => WindowType(code: code, name: code),
+        )
+        .name;
   }
 }

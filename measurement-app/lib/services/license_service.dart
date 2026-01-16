@@ -1,153 +1,188 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/user_controls.dart';
 import 'firestore_service.dart';
+import '../services/app_logger.dart';
 
-/// Service to manage license status and user controls
+/// License status response from server/Firestore
+class LicenseStatus {
+  final String status; // 'active', 'locked', 'expired'
+  final DateTime? licenseExpiry;
+  final String? lockReason;
+  // If forceCheck is true, the app must validate with server immediately
+  final bool forceCheck;
+
+  const LicenseStatus({
+    required this.status,
+    this.licenseExpiry,
+    this.lockReason,
+    this.forceCheck = false,
+  });
+
+  bool get isLocked => status == 'locked';
+  bool get isExpired => status == 'expired';
+  bool get isActive => status == 'active';
+
+  factory LicenseStatus.fromJson(Map<String, dynamic>? json) {
+    if (json == null) {
+      return const LicenseStatus(status: 'active');
+    }
+
+    return LicenseStatus(
+      status: json['status'] ?? 'active',
+      licenseExpiry: json['licenseExpiry'] != null
+          ? DateTime.tryParse(json['licenseExpiry'].toString())
+          : null,
+      lockReason: json['lockReason'],
+      forceCheck: json['forceCheck'] ?? false,
+    );
+  }
+
+  /// Default active status
+  static const LicenseStatus active = LicenseStatus(status: 'active');
+}
+
+/// Service to manage license status with 7-DAY GRACE PERIOD.
+/// Rules:
+/// 1. Check network every 8 hours (Soft Schedule).
+/// 2. Lock ONLY if:
+///    a) Server returns LOCKED.
+///    b) Offline for > 7 DAYS (Hard Expiry).
 class LicenseService {
   static final LicenseService _instance = LicenseService._internal();
   factory LicenseService() => _instance;
   LicenseService._internal();
 
   LicenseStatus _status = LicenseStatus.active;
-  DateTime? _lastCheckTime;
-  Timer? _checkTimer;
+  DateTime? _lastValidCheck;
 
-  // Callbacks for status changes
-  final List<void Function(LicenseStatus)> _listeners = [];
+  // HARD LOCK: Lock if offline > 7 days
+  static const Duration _gracePeriod = Duration(days: 7);
+
+  final List<void Function(LicenseStatus)> _listeners = []; // Callbacks
 
   LicenseStatus get status => _status;
-  UserControls get controls => _status.controls;
-  bool get isLocked => _status.isLocked;
-  bool get isActive => _status.isActive;
-  DateTime? get lastCheckTime => _lastCheckTime;
+  bool get isLocked => _status.isLocked; // Server enforced lock
 
-  /// Initialize and check license status
-  Future<LicenseStatus> initialize() async {
-    // Load cached status first
-    await _loadCachedStatus();
+  /// Returns determined status based on GRACE PERIOD validity.
+  /// If offline and within 7 DAYS -> Active (Session is Valid)
+  bool get isSessionValid {
+    if (_status.isLocked) return false; // Server said lock -> Immediate Lock
 
-    // Then fetch latest from server
-    await checkStatus();
+    // If we never checked, we might allow (first run) or block.
+    // Assuming first run logic is handled separately or treated as 'need check'.
+    // If no check ever, we treat as invalid and force check.
+    if (_lastValidCheck == null) return false;
 
-    // Start periodic check (every 5 minutes)
-    _startPeriodicCheck();
-
-    return _status;
+    final diff = DateTime.now().difference(_lastValidCheck!);
+    return diff < _gracePeriod;
   }
 
-  /// Check license status from Firestore
-  Future<LicenseStatus> checkStatus() async {
+  /// Initialize: LOAD CACHE ONLY.
+  Future<void> initialize() async {
+    await _loadCachedStatus();
+  }
+
+  /// Validate Logic:
+  /// - Only run actual network call if > 8 hours OR force check required.
+  /// - BUT, since SystemGuard calls this on 15s timer explicitly, we run it.
+  Future<LicenseStatus> validate() async {
     try {
       final deviceStatus = await FirestoreService().getDeviceStatus();
 
       if (deviceStatus != null) {
-        _status = LicenseStatus.fromJson(deviceStatus);
-        _lastCheckTime = DateTime.now();
-        await _cacheStatus();
-        _notifyListeners();
-      }
+        final serverStatus = LicenseStatus.fromJson(deviceStatus);
 
+        // If server explicitly locks, we update immediately
+        if (serverStatus.isLocked) {
+          _updateStatus(serverStatus);
+        }
+        // If server says active, we renew our 7-day lease
+        else {
+          _lastValidCheck = DateTime.now();
+          _updateStatus(serverStatus);
+          await _cacheStatus();
+        }
+      }
       return _status;
     } catch (e) {
-      print('LicenseService: Failed to check status: $e');
+      AppLogger().error('LICENSE', 'Validation failed (offline?): $e');
+      // On failure, we DO NOT change status.
+      // isSessionValid getter handles the 7-day grace check.
       return _status;
     }
   }
 
-  /// Cache status locally
+  void _updateStatus(LicenseStatus newStatus) {
+    if (_status.status != newStatus.status ||
+        _status.lockReason != newStatus.lockReason) {
+      _status = newStatus;
+      _notifyListeners();
+    }
+  }
+
   Future<void> _cacheStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final deviceStatus = await FirestoreService().getDeviceStatus();
-      if (deviceStatus != null) {
-        await prefs.setString('license_data', jsonEncode(deviceStatus));
+      Map<String, dynamic> data = {
+        'status': _status.status,
+        'lockReason': _status.lockReason,
+        'licenseExpiry': _status.licenseExpiry?.toIso8601String(),
+        'forceCheck': _status.forceCheck,
+      };
+
+      await prefs.setString('license_data', jsonEncode(data));
+
+      if (_lastValidCheck != null) {
+        await prefs.setInt(
+          'last_valid_session',
+          _lastValidCheck!.millisecondsSinceEpoch,
+        );
       }
-      await prefs.setInt(
-        'last_license_check',
-        DateTime.now().millisecondsSinceEpoch,
-      );
     } catch (e) {
-      print('LicenseService: Cache error: $e');
+      AppLogger().error('LICENSE', 'Cache error: $e');
     }
   }
 
-  /// Load cached status
   Future<void> _loadCachedStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final licenseData = prefs.getString('license_data');
-      final lastCheck = prefs.getInt('last_license_check');
+      final lastSession = prefs.getInt('last_valid_session');
 
       if (licenseData != null) {
-        final data = jsonDecode(licenseData);
-        _status = LicenseStatus.fromJson(data);
+        _status = LicenseStatus.fromJson(jsonDecode(licenseData));
       }
-      if (lastCheck != null) {
-        _lastCheckTime = DateTime.fromMillisecondsSinceEpoch(lastCheck);
+
+      if (lastSession != null) {
+        _lastValidCheck = DateTime.fromMillisecondsSinceEpoch(lastSession);
       }
-    } catch (e) {
-      print('LicenseService: Load cache error: $e');
-    }
+
+      AppLogger().info(
+        'LICENSE',
+        'Loaded cache. Status=${_status.status}, GracePeriodRemaining=${_getGraceRemaining()}',
+      );
+    } catch (_) {}
   }
 
-  /// Start periodic status check
-  void _startPeriodicCheck() {
-    _checkTimer?.cancel();
-    _checkTimer = Timer.periodic(const Duration(minutes: 5), (_) {
-      checkStatus();
-    });
+  String _getGraceRemaining() {
+    if (_lastValidCheck == null) return "None";
+    final expiry = _lastValidCheck!.add(_gracePeriod);
+    final remaining = expiry.difference(DateTime.now());
+    return "${remaining.inDays}d ${remaining.inHours % 24}h";
   }
 
-  /// Add listener for status changes
   void addListener(void Function(LicenseStatus) listener) {
     _listeners.add(listener);
   }
 
-  /// Remove listener
   void removeListener(void Function(LicenseStatus) listener) {
     _listeners.remove(listener);
   }
 
-  /// Notify all listeners
   void _notifyListeners() {
     for (final listener in _listeners) {
       listener(_status);
     }
-  }
-
-  /// Check if a specific action is allowed
-  bool canPerform(String action) {
-    if (isLocked) return false;
-
-    switch (action) {
-      case 'create_customer':
-        return controls.canCreateCustomer;
-      case 'edit_customer':
-        return controls.canEditCustomer;
-      case 'delete_customer':
-        return controls.canDeleteCustomer;
-      case 'create_window':
-        return controls.canCreateWindow;
-      case 'edit_window':
-        return controls.canEditWindow;
-      case 'delete_window':
-        return controls.canDeleteWindow;
-      case 'export':
-        return controls.canExportData;
-      case 'print':
-        return controls.canPrint;
-      case 'share':
-        return controls.canShare;
-      default:
-        return true;
-    }
-  }
-
-  /// Dispose resources
-  void dispose() {
-    _checkTimer?.cancel();
-    _listeners.clear();
   }
 }
