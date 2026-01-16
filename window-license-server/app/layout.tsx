@@ -1,22 +1,20 @@
-import './globals.css';
-import React from 'react';
-import { Toaster } from "@/components/ui/sonner"
+import type { Metadata } from 'next';
+import ThemeRegistry from './ThemeRegistry';
 
-export const metadata = {
+export const metadata: Metadata = {
     title: 'Window License Server',
-    description: 'API Server for Window Measurement App',
+    description: 'Enterprise License Management System',
 };
 
 export default function RootLayout({
     children,
-}: {
+}: Readonly<{
     children: React.ReactNode;
-}) {
+}>) {
     return (
         <html lang="en">
             <body>
-                {children}
-                <Toaster />
+                <ThemeRegistry>{children}</ThemeRegistry>
             </body>
         </html>
     );

@@ -42,15 +42,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
+    final appBarColor =
+        Theme.of(context).appBarTheme.backgroundColor ?? scaffoldColor;
+    final titleColor = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : Colors.black;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F7), // Light background
+      backgroundColor: scaffoldColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Settings',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 24),
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 24,
+            color: titleColor,
+          ),
         ),
         centerTitle: false,
-        backgroundColor: const Color(0xFFF2F4F7),
+        backgroundColor: appBarColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
       ),
@@ -222,13 +233,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildCard({required List<Widget> children}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark
+        ? const Color(0xFF1C1C1E)
+        : Colors.white; // iOS Dark surface or White
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -246,6 +262,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Widget? trailing,
     VoidCallback? onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark ? Colors.white : const Color(0xFF1F2937);
+    final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade500;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -258,7 +278,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.1),
+                  color: iconColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: iconColor, size: 22),
@@ -270,10 +290,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF1F2937),
+                        color: titleColor,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -281,7 +301,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       subtitle,
                       style: TextStyle(
                         fontSize: 13,
-                        color: Colors.grey.shade500,
+                        color: subtitleColor,
                         height: 1.2,
                       ),
                     ),
@@ -304,12 +324,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildDivider() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Divider(
       height: 1,
       thickness: 1,
       indent: 68,
       endIndent: 0,
-      color: const Color(0xFFF3F4F6),
+      color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
     );
   }
 

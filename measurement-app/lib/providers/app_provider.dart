@@ -146,6 +146,29 @@ class AppProvider with ChangeNotifier {
     unawaited(SyncService().syncData());
   }
 
+  Future<void> saveWindows(String customerId, List<Window> windows) async {
+    await _logger.info(
+      'PROVIDER',
+      'saveWindows (Batch) called',
+      'customerId=$customerId, count=${windows.length}',
+    );
+
+    try {
+      await DatabaseHelper.instance.batchSaveWindows(windows);
+
+      // Invalidate cache to ensure we get fresh IDs from DB
+      _windowCache.remove(customerId);
+      // Re-populate cache immediately
+      await getWindows(customerId);
+
+      await loadCustomers(); // Refresh stats
+      unawaited(SyncService().syncData());
+    } catch (e) {
+      await _logger.error('PROVIDER', 'Batch save failed', 'Error: $e');
+      rethrow;
+    }
+  }
+
   Future<void> deleteWindow(String id) async {
     // We need customerId to update cache efficiently, but we only have ID here.
     // We can search the cache.

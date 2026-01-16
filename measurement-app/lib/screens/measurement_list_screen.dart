@@ -17,11 +17,6 @@ import '../widgets/premium_toast.dart';
 import 'package:lottie/lottie.dart';
 import '../main.dart'; // For GlobalParams
 import 'add_customer_screen.dart';
-// import 'dart:io';
-// import 'dart:convert'; // Uncomment when implementing full JSON parsing
-// import 'package:file_picker/file_picker.dart'; // Removed as not added to pubspec
-// import 'dart:convert'; // Uncomment when implementing full JSON parsing
-// import 'package:file_picker/file_picker.dart'; // Removed as not added to pubspec
 
 class MeasurementListScreen extends StatefulWidget {
   const MeasurementListScreen({super.key});

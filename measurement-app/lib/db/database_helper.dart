@@ -734,7 +734,91 @@ class DatabaseHelper {
     }
   }
 
-  // ==================== Sync Helpers ====================
+  Future<void> batchSaveWindows(List<Window> windows) async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      for (var window in windows) {
+        final map = window.toMap();
+        map['updated_at'] = DateTime.now().toIso8601String();
+
+        if (window.id == null) {
+          // CREATE
+          map['id'] = const Uuid().v4();
+          map['sync_status'] = 1;
+          map['is_deleted'] = 0;
+          if (map['created_at'] == null) {
+            map['created_at'] = DateTime.now().toIso8601String();
+          }
+          map['user_id'] = await DeviceIdService.instance.getDeviceId();
+          batch.insert('windows', map);
+        } else {
+          // UPDATE
+          // Check current status only if needed, but for batch efficiency we might skip the read check
+          // and just set to Updated(2) if it was Synced(0).
+          // However, if it was Created(1), it should stay 1.
+          // Reading inside batch for every row might be slow?
+          // Let's optimisticly set to 2, or maybe reading is fine in txn.
+          // Better: Use `txn.query` to check.
+          // For simplicity and speed in batch, we can assume typical update flow.
+          // But to be correct:
+
+          // We can't easily read inside the batch commit loop easily if we use batch.commit().
+          // If we don't use batch(), we can await txn.query.
+          // `db.transaction` allows async await.
+
+          // Let's use individual txn operations instead of batch() object for logic handling
+          // OR just use SQL: UPDATE windows SET ... WHERE id=?
+          // Setting sync_status logic in SQL:
+          // sync_status = CASE WHEN sync_status = 1 THEN 1 ELSE 2 END
+          map['sync_status'] = 2; // Default
+        }
+      }
+    });
+
+    // Re-implementing with individual txn awaits for correctness on SyncStatus logic
+    await db.transaction((txn) async {
+      for (var window in windows) {
+        final map = window.toMap();
+        map['updated_at'] = DateTime.now().toIso8601String();
+
+        if (window.id == null) {
+          // INSERT
+          map['id'] = const Uuid().v4();
+          map['sync_status'] = 1;
+          map['is_deleted'] = 0;
+          if (map['created_at'] == null) {
+            map['created_at'] = DateTime.now().toIso8601String();
+          }
+          map['user_id'] = await DeviceIdService.instance.getDeviceId();
+          await txn.insert('windows', map);
+        } else {
+          // UPDATE
+          // Check existing status
+          final List<Map<String, dynamic>> existing = await txn.query(
+            'windows',
+            columns: ['sync_status'],
+            where: 'id = ?',
+            whereArgs: [window.id],
+          );
+
+          int newStatus = 2;
+          if (existing.isNotEmpty) {
+            final currentStatus = existing.first['sync_status'] as int;
+            if (currentStatus == 1) newStatus = 1;
+          }
+          map['sync_status'] = newStatus;
+
+          await txn.update(
+            'windows',
+            map,
+            where: 'id = ?',
+            whereArgs: [window.id],
+          );
+        }
+      }
+    });
+  }
 
   // Get unsynced (dirty) customers
   Future<List<Customer>> getUnsyncedCustomers() async {

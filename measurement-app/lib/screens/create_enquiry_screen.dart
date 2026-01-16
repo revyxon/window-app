@@ -33,6 +33,9 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
 
   bool _isSaving = false;
 
+  // Regex for Indian Phone Numbers
+  final _phoneRegex = RegExp(r'^(\+91[\-\s]?)?[0-9]{10}$');
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -52,21 +55,26 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Theme references for cleaner code
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: scaffoldColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'New Enquiry',
           style: TextStyle(
             fontWeight: FontWeight.w700,
-            color: Colors.black,
+            color: isDark ? Colors.white : Colors.black,
             fontSize: 20,
           ),
         ),
         centerTitle: false,
-        backgroundColor: Colors.white,
+        backgroundColor: scaffoldColor,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, size: 24),
           onPressed: () => Navigator.pop(context),
@@ -84,14 +92,15 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_phoneFocus),
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w500,
                 fontSize: 18,
-                color: Color(0xFF1F2937),
+                color: textColor,
               ),
               decoration: _buildInputDecoration(
                 'Customer Name *',
                 Icons.person_outline_rounded,
+                isDark,
               ),
               validator: (value) =>
                   value == null || value.isEmpty ? 'Please enter name' : null,
@@ -106,15 +115,24 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_locationFocus),
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w500,
                 fontSize: 18,
-                color: Color(0xFF1F2937),
+                color: textColor,
               ),
               decoration: _buildInputDecoration(
                 'Phone (Optional)',
                 Icons.phone_outlined,
+                isDark,
               ),
+              validator: (val) {
+                if (val != null && val.isNotEmpty) {
+                  if (!_phoneRegex.hasMatch(val)) {
+                    return 'Enter valid 10-digit number';
+                  }
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 16),
 
@@ -133,6 +151,30 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               decoration: _buildInputDecoration(
                 'Location / Area *',
                 Icons.location_on_outlined,
+                isDark,
+              ),
+              validator: (value) => value == null || value.isEmpty
+                  ? 'Please enter location'
+                  : null,
+            ),
+            const SizedBox(height: 16),
+
+            // Location
+            TextFormField(
+              controller: _locationController,
+              focusNode: _locationFocus,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) =>
+                  FocusScope.of(context).requestFocus(_requirementsFocus),
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 18,
+                color: textColor,
+              ),
+              decoration: _buildInputDecoration(
+                'Location / Area *',
+                Icons.location_on_outlined,
+                isDark,
               ),
               validator: (value) => value == null || value.isEmpty
                   ? 'Please enter location'
@@ -148,15 +190,16 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               maxLines: 2,
               onFieldSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_expectedWindowsFocus),
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w500,
                 fontSize: 18,
-                color: Color(0xFF1F2937),
+                color: textColor,
                 height: 1.3,
               ),
               decoration: _buildInputDecoration(
-                'Requirements (e.g. 5 Windows, 2 Doors)',
+                'Requirements',
                 Icons.assignment_outlined,
+                isDark,
               ),
             ),
             const SizedBox(height: 16),
@@ -168,14 +211,15 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_notesFocus),
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w500,
                 fontSize: 18,
-                color: Color(0xFF1F2937),
+                color: textColor,
               ),
               decoration: _buildInputDecoration(
                 'Expected Windows (Optional)',
                 Icons.grid_view_rounded,
+                isDark,
               ),
             ),
             const SizedBox(height: 16),
@@ -186,15 +230,16 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               focusNode: _notesFocus,
               textInputAction: TextInputAction.done,
               maxLines: 3,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w500,
                 fontSize: 18,
-                color: Color(0xFF1F2937),
+                color: textColor,
                 height: 1.3,
               ),
               decoration: _buildInputDecoration(
                 'Optional Notes',
                 Icons.note_alt_outlined,
+                isDark,
               ),
             ),
             const SizedBox(height: 40),
@@ -239,12 +284,29 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
     );
   }
 
-  InputDecoration _buildInputDecoration(String label, IconData icon) {
+  InputDecoration _buildInputDecoration(
+    String label,
+    IconData icon,
+    bool isDark,
+  ) {
+    final borderColor = isDark
+        ? const Color(0xFF374151)
+        : const Color(0xFFE5E7EB);
+    final fillColor = isDark
+        ? const Color(0xFF1F2937)
+        : const Color(0xFFF9FAFB);
+    final hintColor = isDark
+        ? const Color(0xFF9CA3AF)
+        : const Color(0xFF6B7280);
+    final iconColor = isDark
+        ? const Color(0xFFD1D5DB)
+        : const Color(0xFF374151);
+
     return InputDecoration(
       labelText: label,
       alignLabelWithHint: true,
-      labelStyle: const TextStyle(
-        color: Color(0xFF6B7280),
+      labelStyle: TextStyle(
+        color: hintColor,
         fontSize: 17,
         fontWeight: FontWeight.w400,
       ),
@@ -252,25 +314,24 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
         color: Color(0xFF2563EB),
         fontSize: 15,
         fontWeight: FontWeight.w600,
-        backgroundColor: Colors.white,
       ),
       floatingLabelBehavior: FloatingLabelBehavior.auto,
       prefixIcon: Padding(
         padding: const EdgeInsets.only(left: 14, right: 10),
-        child: Icon(icon, color: const Color(0xFF374151), size: 26),
+        child: Icon(icon, color: iconColor, size: 26),
       ),
       prefixIconConstraints: const BoxConstraints(minWidth: 50, minHeight: 50),
       filled: true,
-      fillColor: const Color(0xFFF9FAFB),
+      fillColor: fillColor,
       isCollapsed: false,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+        borderSide: BorderSide(color: borderColor, width: 1),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+        borderSide: BorderSide(color: borderColor, width: 1),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

@@ -1,24 +1,21 @@
-import type { Metadata } from "next"
-import { AdminSidebar } from "@/components/admin-sidebar"
+'use client';
+import * as React from 'react';
+import Box from '@mui/material/Box';
+import AdminSidebar from '../../components/AdminSidebar';
+import AdminTopBar from '../../components/AdminTopBar';
+import Toolbar from '@mui/material/Toolbar';
 
-export const metadata: Metadata = {
-    title: "Window Admin",
-    description: "Window Measurement App Admin Dashboard",
-}
+const DRAWER_WIDTH = 260;
 
-export default function AdminLayout({
-    children,
-}: {
-    children: React.ReactNode
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
     return (
-        <div className="flex min-h-screen">
-            <AdminSidebar className="hidden w-64 md:block fixed h-full" />
-            <main className="flex-1 md:pl-64">
-                <div className="p-8">
-                    {children}
-                </div>
-            </main>
-        </div>
-    )
+        <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f8fafc' }}>
+            <AdminTopBar drawerWidth={DRAWER_WIDTH} />
+            <AdminSidebar />
+            <Box component="main" sx={{ flexGrow: 1, p: 3, width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` } }}>
+                <Toolbar /> {/* Spacer for fixed AppBar */}
+                {children}
+            </Box>
+        </Box>
+    );
 }

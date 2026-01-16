@@ -5,6 +5,7 @@ import '../models/customer.dart';
 import '../providers/app_provider.dart';
 import '../utils/fast_page_route.dart';
 import '../widgets/premium_toast.dart';
+import '../utils/constant_data.dart';
 import 'window_input_screen.dart';
 
 class AddCustomerScreen extends StatefulWidget {
@@ -30,18 +31,12 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
   final _phoneFocus = FocusNode();
   final _rateFocus = FocusNode();
 
-  String _selectedFramework = 'Inventa';
+  String _selectedFramework = ConstantData.frameworks.first;
   String? _selectedGlassType;
   bool _isFinalMeasurement = false;
 
-  final List<String> _glassTypes = [
-    '5MM Clear Glass',
-    '5MM Toughened Glass',
-    '5MM Clear Toughened Glass',
-    '5MM Frosted Glass',
-    '5MM Frosted Toughened Glass',
-    '5MM Reflective Glass',
-  ];
+  // Regex for Indian Phone Numbers (10 digits, optional +91)
+  final _phoneRegex = RegExp(r'^(\+91[\-\s]?)?[0-9]{10}$');
 
   @override
   void dispose() {
@@ -60,20 +55,26 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'New Customer',
           style: TextStyle(
             fontWeight: FontWeight.w700,
-            color: Colors.black,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black,
             fontSize: 20,
           ),
         ),
         centerTitle: false,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
+        iconTheme: IconThemeData(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white
+              : Colors.black,
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, size: 24),
           onPressed: () => Navigator.pop(context),
@@ -135,15 +136,24 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_rateFocus),
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w500,
                 fontSize: 18,
-                color: Color(0xFF1F2937),
+                color: Theme.of(context).textTheme.bodyLarge?.color,
               ),
               decoration: _buildInputDecoration(
                 'Phone (Optional)',
                 Icons.phone_outlined,
               ),
+              validator: (val) {
+                if (val != null && val.isNotEmpty) {
+                  // Only validate if user entered something
+                  if (!_phoneRegex.hasMatch(val)) {
+                    return 'Enter valid 10-digit number';
+                  }
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 24),
 
@@ -158,11 +168,16 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
             ),
             const SizedBox(height: 12),
             Row(
-              children: [
-                Expanded(child: _buildFrameworkButton('Inventa')),
-                const SizedBox(width: 12),
-                Expanded(child: _buildFrameworkButton('Optima')),
-              ],
+              children: ConstantData.frameworks.map((f) {
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      right: f == ConstantData.frameworks.last ? 0 : 12,
+                    ),
+                    child: _buildFrameworkButton(f),
+                  ),
+                );
+              }).toList(),
             ),
             const SizedBox(height: 24),
 
@@ -174,9 +189,9 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                 color: Color(0xFF6B7280),
                 size: 26,
               ),
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF1F2937),
+                color: Theme.of(context).textTheme.bodyLarge?.color,
                 fontSize: 18,
               ),
               decoration: _buildInputDecoration(
@@ -184,7 +199,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                 Icons.layers_outlined,
               ),
               // Add 'Other' option
-              items: [..._glassTypes, 'Other'].map((type) {
+              items: [...ConstantData.glassTypes, 'Other'].map((type) {
                 return DropdownMenuItem(value: type, child: Text(type));
               }).toList(),
               onChanged: (value) => setState(() => _selectedGlassType = value),

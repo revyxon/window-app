@@ -135,59 +135,53 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
   }
 
   Future<void> _saveAll() async {
+    final List<Window> windowsToSave = [];
+
     for (var controller in _windowControllers) {
       final w = double.tryParse(controller.widthController.text) ?? 0;
       final h = double.tryParse(controller.heightController.text) ?? 0;
 
-      // For L-Corner, we need W2 as well? Or is it optional? Assuming mandatory if Type is LC
-      // But we just check basic W/H > 0 for standard windows.
-
       if (w > 0 && h > 0) {
         double? w2;
-        if (controller.selectedType == 'LC') {
+        if (controller.selectedType == WindowType.lCorner) {
           w2 = double.tryParse(controller.width2Controller.text);
         }
 
         String? customName;
-        if (controller.selectedType == 'CUST') {
+        if (controller.selectedType == WindowType.custom) {
           customName = controller.customNameController.text;
           if (customName.isEmpty) customName = 'Custom Window';
         }
 
-        final window = Window(
-          id: controller.id,
-          customerId: widget.customer.id!,
-          name: controller.name,
-          width: w,
-          height: h,
-          type: controller.selectedType,
-          width2: w2,
-          customName: customName,
-          // Formula is stored in Settings, maybe we should store what was used at time of creation?
-          // The model has 'formula' field. Let's store it so we know which one was applied.
-          formula: (controller.selectedType == 'LC')
-              ? Provider.of<SettingsProvider>(
-                  context,
-                  listen: false,
-                ).lCornerFormula
-              : null,
-          quantity: controller.quantity,
-          createdAt: DateTime.now(),
-          isOnHold: controller.isOnHold, // Persist hold state
+        windowsToSave.add(
+          Window(
+            id: controller.id,
+            customerId: widget.customer.id!,
+            name: controller.name,
+            width: w,
+            height: h,
+            type: controller.selectedType,
+            width2: w2,
+            customName: customName,
+            formula: (controller.selectedType == WindowType.lCorner)
+                ? Provider.of<SettingsProvider>(
+                    context,
+                    listen: false,
+                  ).lCornerFormula
+                : null,
+            quantity: controller.quantity,
+            createdAt: DateTime.now(),
+            isOnHold: controller.isOnHold,
+          ),
         );
-
-        if (controller.id == null) {
-          await Provider.of<AppProvider>(
-            context,
-            listen: false,
-          ).addWindow(window);
-        } else {
-          await Provider.of<AppProvider>(
-            context,
-            listen: false,
-          ).updateWindow(window);
-        }
       }
+    }
+
+    if (windowsToSave.isNotEmpty) {
+      await Provider.of<AppProvider>(
+        context,
+        listen: false,
+      ).saveWindows(widget.customer.id!, windowsToSave);
     }
 
     if (mounted) {
@@ -234,99 +228,102 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF2563EB)),
             )
-          : Column(
-              children: [
-                // Compact Stats Bar
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12,
-                    horizontal: 20,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border(
-                      bottom: BorderSide(color: Colors.grey.shade200),
+          : GestureDetector(
+              onTap: () => FocusScope.of(context).unfocus(),
+              child: Column(
+                children: [
+                  // Compact Stats Bar
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 20,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border(
+                        bottom: BorderSide(color: Colors.grey.shade200),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                FluentIcons.grid_20_filled,
+                                color: const Color(0xFF2563EB),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '$_activeWindowCount',
+                                style: const TextStyle(
+                                  color: Color(0xFF2563EB),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Windows',
+                                style: TextStyle(
+                                  color: Color(0xFF6B7280),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          width: 1,
+                          height: 28,
+                          color: const Color(0xFFE5E7EB),
+                        ),
+                        Expanded(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                FluentIcons.ruler_20_filled,
+                                color: const Color(0xFF2563EB),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _totalSqFt.toStringAsFixed(2),
+                                style: const TextStyle(
+                                  color: Color(0xFF2563EB),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Total Sq.Ft',
+                                style: TextStyle(
+                                  color: Color(0xFF6B7280),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              FluentIcons.grid_20_filled,
-                              color: const Color(0xFF2563EB),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '$_activeWindowCount',
-                              style: const TextStyle(
-                                color: Color(0xFF2563EB),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Text(
-                              'Windows',
-                              style: TextStyle(
-                                color: Color(0xFF6B7280),
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        width: 1,
-                        height: 28,
-                        color: const Color(0xFFE5E7EB),
-                      ),
-                      Expanded(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              FluentIcons.ruler_20_filled,
-                              color: const Color(0xFF2563EB),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _totalSqFt.toStringAsFixed(2),
-                              style: const TextStyle(
-                                color: Color(0xFF2563EB),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Text(
-                              'Total Sq.Ft',
-                              style: TextStyle(
-                                color: Color(0xFF6B7280),
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  // Window Cards List
+                  Expanded(
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _windowControllers.length,
+                      itemBuilder: (context, index) =>
+                          _buildWindowInputCard(index),
+                    ),
                   ),
-                ),
-                // Window Cards List
-                Expanded(
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _windowControllers.length,
-                    itemBuilder: (context, index) =>
-                        _buildWindowInputCard(index),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addNewWindow(autoFocus: true),

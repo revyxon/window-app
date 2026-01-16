@@ -22,22 +22,7 @@ class ShareBottomSheet extends StatelessWidget {
   String _generateShareText() {
     final buffer = StringBuffer();
     final now = DateTime.now();
-    final months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    final dateStr =
-        '${now.day.toString().padLeft(2, '0')}-${months[now.month - 1]}-${now.year}';
+    final dateStr = DateFormat('dd-MMM-yyyy').format(now);
 
     buffer.writeln('*DD UPVC WINDOWS SYSTEM*');
     buffer.writeln('================================');
