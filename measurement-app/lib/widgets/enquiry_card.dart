@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../models/enquiry.dart';
-import '../utils/app_colors.dart';
+import '../providers/settings_provider.dart';
+import '../ui/components/app_card.dart';
+import '../ui/components/app_icon.dart';
+import '../ui/design_system.dart';
 import '../utils/haptics.dart';
-import 'glass_container.dart';
+
+/// Fixed status colors - NOT theme dependent
+const _pendingColor = Color(0xFFF59E0B);
+const _convertedColor = Color(0xFF10B981);
+const _dismissedColor = Color(0xFF6B7280);
 
 class EnquiryCard extends StatelessWidget {
   final Enquiry enquiry;
@@ -15,155 +22,160 @@ class EnquiryCard extends StatelessWidget {
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return Colors.orange;
+        return _pendingColor;
       case 'converted':
-        return Colors.green;
+        return _convertedColor;
       case 'dismissed':
-        return Colors.grey;
+        return _dismissedColor;
       default:
-        return AppColors.primary;
-    }
-  }
-
-  Color _getStatusBgColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Colors.orange.withValues(alpha: 0.1);
-      case 'converted':
-        return Colors.green.withValues(alpha: 0.1);
-      case 'dismissed':
-        return Colors.grey.withValues(alpha: 0.1);
-      default:
-        return AppColors.primary.withValues(alpha: 0.1);
+        return _pendingColor;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final settings = context.watch<SettingsProvider>();
     final dateStr = DateFormat('MMM d, y').format(enquiry.createdAt);
+    final statusColor = _getStatusColor(enquiry.status);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: GlassContainer(
-        padding: const EdgeInsets.all(16),
-        onTap: () {
-          Haptics.light();
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: AppCard(
+        onPressed: () {
+          if (settings.hapticFeedback) Haptics.light();
           onTap?.call();
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header: Name + Status badge
+            // Header: Name + Status Badge
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: Text(
                     enquiry.name,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _getStatusBgColor(enquiry.status),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        enquiry.status.toLowerCase() == 'converted'
-                            ? FluentIcons.checkmark_circle_24_filled
-                            : FluentIcons.clock_24_regular,
-                        size: 14,
-                        color: _getStatusColor(enquiry.status),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        enquiry.status.toUpperCase(),
-                        style: TextStyle(
-                          color: _getStatusColor(enquiry.status),
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                _buildStatusBadge(theme, statusColor),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
 
-            // Location & Date Row
-            Row(
-              children: [
-                if (enquiry.location != null &&
-                    enquiry.location!.isNotEmpty) ...[
-                  const Icon(
-                    FluentIcons.location_24_regular,
+            // Location
+            if (enquiry.location != null && enquiry.location!.isNotEmpty)
+              Row(
+                children: [
+                  AppIcon(
+                    AppIconType.location,
                     size: 16,
-                    color: Colors.grey,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: Text(
                       enquiry.location!,
-                      style: const TextStyle(color: Colors.grey),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 8),
                 ],
-
-                Text(
-                  dateStr,
-                  style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
-                ),
-              ],
-            ),
-
-            // Requirements Preview (if available)
-            if (enquiry.requirements != null &&
-                enquiry.requirements!.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                enquiry.requirements!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
               ),
-            ],
+            const SizedBox(height: AppSpacing.md),
 
-            // Phone (if available)
-            if (enquiry.phone != null && enquiry.phone!.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(
-                    FluentIcons.phone_24_regular,
-                    size: 16,
-                    color: AppColors.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    enquiry.phone!,
-                    style: const TextStyle(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w500,
+            // Bottom Row: Date + Phone + Windows
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Left: Date info
+                Row(
+                  children: [
+                    AppIcon(
+                      AppIconType.calendar,
+                      size: 16,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      dateStr,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
+                      ),
+                    ),
+                    if (enquiry.phone != null && enquiry.phone!.isNotEmpty) ...[
+                      const SizedBox(width: AppSpacing.lg),
+                      AppIcon(
+                        AppIconType.phone,
+                        size: 16,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        enquiry.phone!,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+
+                // Right: Expected Windows Pill
+                if (enquiry.expectedWindows != null &&
+                    enquiry.expectedWindows!.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.xs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
+                    ),
+                    child: Text(
+                      enquiry.expectedWindows!,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(ThemeData theme, Color statusColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Text(
+        enquiry.status.toUpperCase(),
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: statusColor,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
         ),
       ),
     );

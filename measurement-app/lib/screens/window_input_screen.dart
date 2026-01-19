@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+// import 'package:fluentui_system_icons/fluentui_system_icons.dart'; // Removed as we use AppIcon
 import 'dart:ui';
 import '../models/customer.dart';
 import '../models/window.dart';
@@ -9,6 +9,7 @@ import '../providers/app_provider.dart';
 import '../providers/settings_provider.dart';
 import '../utils/window_types.dart';
 import '../utils/window_calculator.dart';
+import '../ui/components/app_icon.dart';
 
 class WindowInputScreen extends StatefulWidget {
   final Customer customer;
@@ -44,6 +45,7 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
       context,
       listen: false,
     ).getWindows(widget.customer.id!);
+    if (!mounted) return;
     setState(() {
       _windowControllers = windows
           .map((w) => WindowInputController.fromWindow(w))
@@ -63,13 +65,17 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
 
     if (autoFocus) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-        );
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+          );
+        }
         Future.delayed(const Duration(milliseconds: 200), () {
-          _windowControllers.last.widthFocus.requestFocus();
+          if (mounted && _windowControllers.isNotEmpty) {
+            _windowControllers.last.widthFocus.requestFocus();
+          }
         });
       });
     }
@@ -83,6 +89,7 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
         listen: false,
       ).deleteWindow(controller.id!);
     }
+    if (!mounted) return;
     setState(() {
       _windowControllers[index].dispose();
       _windowControllers.removeAt(index);
@@ -103,7 +110,6 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
     double h = double.tryParse(c.heightController.text) ?? 0;
     double w2 = 0;
 
-    // Check for L-Corner
     if (c.selectedType == WindowType.lCorner) {
       w2 = double.tryParse(c.width2Controller.text) ?? 0;
     }
@@ -135,6 +141,9 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
   }
 
   Future<void> _saveAll() async {
+    // Validate current inputs before saving? User didn't ask for validation changes.
+    // Preserving logic.
+
     final List<Window> windowsToSave = [];
 
     for (var controller in _windowControllers) {
@@ -191,33 +200,34 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black, size: 24),
+          icon: AppIcon(AppIconType.back, color: theme.colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           widget.customer.name,
-          style: const TextStyle(
+          style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w700,
-            color: Colors.black,
-            fontSize: 20,
           ),
         ),
         centerTitle: false,
         actions: [
           TextButton(
             onPressed: _saveAll,
-            child: const Text(
+            child: Text(
               'Save',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF2563EB),
+                color: theme.colorScheme.primary,
               ),
             ),
           ),
@@ -225,8 +235,10 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF2563EB)),
+          ? Center(
+              child: CircularProgressIndicator(
+                color: theme.colorScheme.primary,
+              ),
             )
           : GestureDetector(
               onTap: () => FocusScope.of(context).unfocus(),
@@ -239,9 +251,9 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
                       horizontal: 20,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: theme.cardColor,
                       border: Border(
-                        bottom: BorderSide(color: Colors.grey.shade200),
+                        bottom: BorderSide(color: theme.dividerColor),
                       ),
                     ),
                     child: Row(
@@ -250,25 +262,27 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                FluentIcons.grid_20_filled,
-                                color: const Color(0xFF2563EB),
+                              AppIcon(
+                                AppIconType.icons,
+                                color: theme.colorScheme.primary,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 '$_activeWindowCount',
-                                style: const TextStyle(
-                                  color: Color(0xFF2563EB),
+                                style: TextStyle(
+                                  color: theme.colorScheme.primary,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 18,
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              const Text(
+                              Text(
                                 'Windows',
-                                style: TextStyle(
-                                  color: Color(0xFF6B7280),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.6,
+                                  ),
                                   fontSize: 13,
                                 ),
                               ),
@@ -278,31 +292,33 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
                         Container(
                           width: 1,
                           height: 28,
-                          color: const Color(0xFFE5E7EB),
+                          color: theme.dividerColor,
                         ),
                         Expanded(
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                FluentIcons.ruler_20_filled,
-                                color: const Color(0xFF2563EB),
+                              AppIcon(
+                                AppIconType.measurement,
+                                color: theme.colorScheme.primary,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 _totalSqFt.toStringAsFixed(2),
-                                style: const TextStyle(
-                                  color: Color(0xFF2563EB),
+                                style: TextStyle(
+                                  color: theme.colorScheme.primary,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 18,
                                 ),
                               ),
                               const SizedBox(width: 6),
-                              const Text(
+                              Text(
                                 'Total Sq.Ft',
-                                style: TextStyle(
-                                  color: Color(0xFF6B7280),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.6,
+                                  ),
                                   fontSize: 13,
                                 ),
                               ),
@@ -327,9 +343,9 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _addNewWindow(autoFocus: true),
-        backgroundColor: const Color(0xFF2563EB),
+        backgroundColor: theme.colorScheme.primary,
         elevation: 4,
-        child: const Icon(Icons.add, size: 26, color: Colors.white),
+        child: const AppIcon(AppIconType.add, size: 26, color: Colors.white),
       ),
     );
   }
@@ -338,9 +354,19 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
     final controller = _windowControllers[index];
     final sqFt = _calculateCardSqFt(controller);
     final isOnHold = controller.isOnHold;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     // Glassmorphic effect when on hold
     if (isOnHold) {
+      // Keep original amber style but adapting for dark mode readability if needed
+      // Or keeping it consistent with light mode if that was the design
+      // Let's use amber containers with alpha to make it look nicer
+      final holdBg = isDark
+          ? Colors.amber.shade900.withValues(alpha: 0.3)
+          : Colors.amber.shade50.withValues(alpha: 0.9);
+      final holdBorder = isDark ? Colors.amber.shade700 : Colors.amber.shade400;
+
       return Container(
         margin: const EdgeInsets.only(bottom: 12),
         child: ClipRRect(
@@ -349,9 +375,9 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
             filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.amber.shade50.withAlpha(230),
+                color: holdBg,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.amber.shade400, width: 1.5),
+                border: Border.all(color: holdBorder, width: 1.5),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: _buildCardContent(index, controller, sqFt, isOnHold),
@@ -365,9 +391,13 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
+        color: isDark ? theme.colorScheme.surface : const Color(0xFFF9FAFB),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(
+          color: isDark
+              ? theme.colorScheme.outlineVariant
+              : const Color(0xFFE5E7EB),
+        ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: _buildCardContent(index, controller, sqFt, isOnHold),
@@ -380,6 +410,9 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
     double sqFt,
     bool isOnHold,
   ) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     // Check if L-Corner or Custom to show extra fields
     final isLCorner =
         controller.selectedType == WindowType.lCorner ||
@@ -397,16 +430,18 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: isOnHold
-                    ? Colors.amber.shade200
-                    : const Color(0xFFDBEAFE),
+                    ? (isDark
+                          ? Colors.amber.shade900.withValues(alpha: 0.5)
+                          : Colors.amber.shade200)
+                    : theme.colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
                 controller.name,
                 style: TextStyle(
                   color: isOnHold
-                      ? Colors.amber.shade900
-                      : const Color(0xFF2563EB),
+                      ? (isDark ? Colors.amber.shade100 : Colors.amber.shade900)
+                      : theme.colorScheme.primary,
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                 ),
@@ -417,7 +452,7 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: theme.cardColor,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: const Color(0xFF10B981), width: 1),
               ),
@@ -434,9 +469,13 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
             // Quantity Controls
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: theme.cardColor,
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
+                border: Border.all(
+                  color: isDark
+                      ? theme.colorScheme.outlineVariant
+                      : const Color(0xFFE5E7EB),
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -454,8 +493,10 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
                         Icons.remove,
                         size: 18,
                         color: controller.quantity > 1
-                            ? Colors.black
-                            : Colors.grey.shade300,
+                            ? theme.colorScheme.onSurface
+                            : theme.colorScheme.onSurface.withValues(
+                                alpha: 0.3,
+                              ),
                       ),
                     ),
                   ),
@@ -466,49 +507,57 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
                     ),
                     decoration: BoxDecoration(
                       border: Border.symmetric(
-                        vertical: BorderSide(color: Colors.grey.shade200),
+                        vertical: BorderSide(color: theme.dividerColor),
                       ),
                     ),
                     child: Text(
                       '×${controller.quantity}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 14,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                   ),
                   InkWell(
                     onTap: () => setState(() => controller.quantity++),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
                         horizontal: 10,
                         vertical: 6,
                       ),
-                      child: Icon(Icons.add, size: 18, color: Colors.black),
+                      child: Icon(
+                        Icons.add,
+                        size: 18,
+                        color: theme.colorScheme.onSurface,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 10),
-            // Hold Button - Bigger icon
+            // Hold Button
             GestureDetector(
               onTap: () => _toggleHold(index),
               child: Icon(
                 isOnHold
-                    ? FluentIcons.play_circle_24_filled
-                    : FluentIcons.pause_circle_24_regular,
-                color: isOnHold ? Colors.green : const Color(0xFF6B7280),
+                    ? Icons.play_circle_filled
+                    : Icons.pause_circle_outline,
+                color: isOnHold
+                    ? Colors.green
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 size: 26,
               ),
             ),
+
             const SizedBox(width: 8),
-            // Delete Button - Bigger icon
+            // Delete Button
             GestureDetector(
               onTap: () => _removeWindow(index),
-              child: const Icon(
-                FluentIcons.delete_24_regular,
-                color: Color(0xFFEF4444),
+              child: AppIcon(
+                AppIconType.delete,
+                color: theme.colorScheme.error,
                 size: 26,
               ),
             ),
@@ -516,12 +565,12 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
         ),
 
         if (isOnHold)
-          const Padding(
-            padding: EdgeInsets.only(top: 6),
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
             child: Text(
               '⏸ On Hold - Not included in total',
               style: TextStyle(
-                color: Color(0xFFB45309),
+                color: isDark ? Colors.amber.shade200 : const Color(0xFFB45309),
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
               ),
@@ -530,7 +579,7 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
 
         const SizedBox(height: 12),
 
-        // Custom Name Input (Only for Custom)
+        // Custom Name Input
         if (isCustom)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -539,7 +588,11 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
               focusNode: controller.customNameFocus,
               textInputAction: TextInputAction.next,
               onSubmitted: (_) => controller.widthFocus.requestFocus(),
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: theme.colorScheme.onSurface,
+              ),
               decoration: _inputDecoration('Window Name (e.g. Kitchen)'),
               onChanged: (val) => setState(() {}),
             ),
@@ -562,19 +615,23 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
                     controller.heightFocus.requestFocus();
                   }
                 },
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w500,
-                ), // +4px
+                  color: theme.colorScheme.onSurface,
+                ),
                 decoration: _inputDecoration('Width (mm)'),
                 onChanged: (val) => setState(() {}),
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Text(
                 '×',
-                style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 20),
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                  fontSize: 20,
+                ),
               ),
             ),
             Expanded(
@@ -584,10 +641,11 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 textInputAction: TextInputAction.done,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w500,
-                ), // +4px
+                  color: theme.colorScheme.onSurface,
+                ),
                 decoration: _inputDecoration('Height (mm)'),
                 onChanged: (val) => setState(() {}),
               ),
@@ -606,7 +664,11 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               textInputAction: TextInputAction.next,
               onSubmitted: (_) => controller.heightFocus.requestFocus(),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: theme.colorScheme.onSurface,
+              ),
               decoration: _inputDecoration('Width 2 (mm)'),
               onChanged: (val) => setState(() {}),
             ),
@@ -616,20 +678,13 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
 
         // Type Selection Chips
         Row(
-          children: ['3T', '2T', WindowType.lCorner, 'FIX', 'More'].map((
-            typeCode,
-          ) {
+          children: ['3T', '2T', 'FIX', 'V', 'More'].map((typeCode) {
             final isSelected = controller.selectedType == typeCode;
-            final isDark = Theme.of(context).brightness == Brightness.dark;
-            final unselectedBg = isDark
-                ? const Color(0xFF2C2C2E)
-                : Colors.white;
+            final unselectedBg = theme.colorScheme.surfaceContainerHighest;
             final unselectedBorder = isDark
-                ? const Color(0xFF3A3A3C)
+                ? theme.colorScheme.outlineVariant
                 : const Color(0xFFE5E7EB);
-            final unselectedText = isDark
-                ? Colors.white70
-                : const Color(0xFF374151);
+            final unselectedText = theme.colorScheme.onSurface;
 
             return Expanded(
               child: Padding(
@@ -648,12 +703,12 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? const Color(0xFF2563EB)
+                          ? theme.colorScheme.primary
                           : unselectedBg,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
                         color: isSelected
-                            ? const Color(0xFF2563EB)
+                            ? theme.colorScheme.primary
                             : unselectedBorder,
                       ),
                     ),
@@ -677,46 +732,52 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
   }
 
   InputDecoration _inputDecoration(String label) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hintColor = isDark ? Colors.grey.shade400 : const Color(0xFF6B7280);
-    final fillColor = isDark
-        ? const Color(0xFF2C2C2E)
-        : Colors.white; // Changed from white to theme-aware
-    // Note: If using standard theme input decoration, better to use null or Theme colors.
-    // Keeping similar to previous style but dark-aware.
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final hintColor = theme.colorScheme.onSurface.withValues(alpha: 0.5);
+    // Use surface color for fill, or slight variation
+    final fillColor = isDark ? theme.colorScheme.surface : Colors.white;
 
     return InputDecoration(
       labelText: label,
-      labelStyle: TextStyle(
-        fontSize: 15,
-        color: hintColor,
-      ), // Bigger placeholder
+      labelStyle: TextStyle(fontSize: 15, color: hintColor),
       floatingLabelStyle: TextStyle(
-        fontSize: 14, // +8px from before (was 12, now 14)
-        color: const Color(0xFF2563EB),
+        fontSize: 14,
+        color: theme.colorScheme.primary,
         fontWeight: FontWeight.w600,
-        backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        backgroundColor: theme
+            .scaffoldBackgroundColor, // Ensure label background matches scaffold to hide line
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       filled: true,
-      fillColor:
-          fillColor, // Explicitly set fill color to override default if needed or strictly match design
+      fillColor: fillColor,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+        borderSide: BorderSide(
+          color: isDark
+              ? theme.colorScheme.outlineVariant
+              : const Color(0xFFE5E7EB),
+        ),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+        borderSide: BorderSide(
+          color: isDark
+              ? theme.colorScheme.outlineVariant
+              : const Color(0xFFE5E7EB),
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+        borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
       ),
     );
   }
 
   void _showMoreTypesMenu(WindowInputController controller) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     // Main types shown as chips
     const mainTypes = ['3T', '2T', 'LC', 'FIX'];
 
@@ -727,6 +788,7 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
 
     showModalBottomSheet(
       context: context,
+      backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -737,9 +799,11 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Select Window Type',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 16),
               Wrap(
@@ -757,15 +821,20 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF3F4F6),
+                        color: theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                        border: Border.all(
+                          color: isDark
+                              ? theme.colorScheme.outlineVariant
+                              : const Color(0xFFE5E7EB),
+                        ),
                       ),
                       child: Text(
-                        type.name, // Show full name in menu
-                        style: const TextStyle(
+                        type.name,
+                        style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -775,9 +844,12 @@ class _WindowInputScreenState extends State<WindowInputScreen> {
               const SizedBox(height: 16),
 
               // Hint for Custom
-              const Text(
+              Text(
                 '* Select "Custom Window" to enter a manual name.',
-                style: TextStyle(color: Colors.grey, fontSize: 12),
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  fontSize: 12,
+                ),
               ),
               const SizedBox(height: 10),
             ],
@@ -798,8 +870,8 @@ class WindowInputController {
 
   FocusNode widthFocus;
   FocusNode heightFocus;
-  FocusNode width2Focus;
-  FocusNode customNameFocus;
+  FocusNode width2Focus; // New
+  FocusNode customNameFocus; // New
 
   String selectedType;
   int quantity;
@@ -808,17 +880,17 @@ class WindowInputController {
   WindowInputController({
     this.id,
     required this.name,
-    String? width,
-    String? height,
-    String? width2,
-    String? customName,
+    String? initialWidth,
+    String? initialHeight,
+    String? initialWidth2,
+    String? initialCustomName,
     this.selectedType = '3T',
     this.quantity = 1,
     this.isOnHold = false,
-  }) : widthController = TextEditingController(text: width),
-       heightController = TextEditingController(text: height),
-       width2Controller = TextEditingController(text: width2),
-       customNameController = TextEditingController(text: customName),
+  }) : widthController = TextEditingController(text: initialWidth),
+       heightController = TextEditingController(text: initialHeight),
+       width2Controller = TextEditingController(text: initialWidth2),
+       customNameController = TextEditingController(text: initialCustomName),
        widthFocus = FocusNode(),
        heightFocus = FocusNode(),
        width2Focus = FocusNode(),
@@ -828,12 +900,10 @@ class WindowInputController {
     return WindowInputController(
       id: w.id,
       name: w.name,
-      width: w.width > 0 ? w.width.toStringAsFixed(0) : '',
-      height: w.height > 0 ? w.height.toStringAsFixed(0) : '',
-      width2: w.width2 != null && w.width2! > 0
-          ? w.width2!.toStringAsFixed(0)
-          : '',
-      customName: w.customName,
+      initialWidth: w.width.toString(),
+      initialHeight: w.height.toString(),
+      initialWidth2: w.width2?.toString(),
+      initialCustomName: w.customName,
       selectedType: w.type,
       quantity: w.quantity,
       isOnHold: w.isOnHold,

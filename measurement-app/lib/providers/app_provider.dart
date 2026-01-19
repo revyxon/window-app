@@ -28,24 +28,46 @@ class AppProvider with ChangeNotifier {
     unawaited(SyncService().syncData());
   }
 
+  /// PRO: Smart Refresh for a single customer
+  Future<void> _refreshCustomer(String id) async {
+    final updated = await DatabaseHelper.instance.readCustomerWithStats(id);
+    if (updated != null) {
+      final index = _customers.indexWhere((c) => c.id == id);
+      if (index != -1) {
+        _customers[index] = updated;
+        notifyListeners();
+      } else {
+        // If not found (maybe new?), insert at top
+        _customers.insert(0, updated);
+        notifyListeners();
+      }
+    }
+  }
+
   Future<Customer> addCustomer(Customer customer) async {
     final createdCustomer = await DatabaseHelper.instance.createCustomer(
       customer,
     );
-    await loadCustomers();
+    // Smart Refresh: Insert directly at top
+    _customers.insert(0, createdCustomer);
+    notifyListeners();
+
     unawaited(SyncService().syncData());
     return createdCustomer;
   }
 
   Future<void> updateCustomer(Customer customer) async {
     await DatabaseHelper.instance.updateCustomer(customer);
-    await loadCustomers();
+    // Smart Refresh: Reload only this customer
+    await _refreshCustomer(customer.id!);
     unawaited(SyncService().syncData());
   }
 
   Future<void> deleteCustomer(String id) async {
     await DatabaseHelper.instance.deleteCustomer(id);
-    await loadCustomers();
+    // Smart Refresh: Remove locally
+    _customers.removeWhere((c) => c.id == id);
+    notifyListeners();
     unawaited(SyncService().syncData());
   }
 
@@ -113,7 +135,7 @@ class AppProvider with ChangeNotifier {
         'customerId=${window.customerId}',
       );
       // Refresh customers list to update stats (count/sqft)
-      await loadCustomers();
+      await _refreshCustomer(window.customerId);
     } catch (e) {
       await _logger.error('PROVIDER', 'FAILED to add window', 'Error: $e');
       // Revert optimistic update on failure
@@ -142,7 +164,7 @@ class AppProvider with ChangeNotifier {
     }
 
     await DatabaseHelper.instance.updateWindow(window);
-    await loadCustomers(); // Refresh stats
+    await _refreshCustomer(window.customerId); // Refresh stats
     unawaited(SyncService().syncData());
   }
 
@@ -161,7 +183,10 @@ class AppProvider with ChangeNotifier {
       // Re-populate cache immediately
       await getWindows(customerId);
 
-      await loadCustomers(); // Refresh stats
+      // Re-populate cache immediately
+      await getWindows(customerId);
+
+      await _refreshCustomer(customerId); // Refresh stats
       unawaited(SyncService().syncData());
     } catch (e) {
       await _logger.error('PROVIDER', 'Batch save failed', 'Error: $e');
@@ -186,7 +211,15 @@ class AppProvider with ChangeNotifier {
     }
 
     await DatabaseHelper.instance.deleteWindow(id);
-    await loadCustomers(); // Refresh stats
+
+    // Refresh stats if we found the customerId
+    if (customerIdFound != null) {
+      await _refreshCustomer(customerIdFound);
+    } else {
+      // Fallback if cache missed (rare)
+      await loadCustomers();
+    }
+
     unawaited(SyncService().syncData());
   }
 

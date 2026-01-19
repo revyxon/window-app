@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:provider/provider.dart';
 import '../models/customer.dart';
-import '../utils/app_colors.dart';
+import '../providers/settings_provider.dart';
+import '../ui/components/app_card.dart';
+import '../ui/design_system.dart';
+import '../ui/components/app_icon.dart';
 import '../utils/haptics.dart';
 import '../utils/fast_page_route.dart';
-import 'glass_container.dart';
 import '../screens/customer_detail_screen.dart';
+
+/// Fixed green badge color - NOT theme dependent
+const _badgeGreen = Color(0xFF10B981);
 
 class CustomerCard extends StatelessWidget {
   final Customer customer;
@@ -14,12 +19,15 @@ class CustomerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final settings = context.watch<SettingsProvider>();
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: GlassContainer(
-        padding: const EdgeInsets.all(16),
-        onTap: () {
-          Haptics.light();
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: AppCard(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        onPressed: () {
+          if (settings.hapticFeedback) Haptics.light();
           Navigator.push(
             context,
             FastPageRoute(page: CustomerDetailScreen(customer: customer)),
@@ -35,127 +43,95 @@ class CustomerCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     customer.name,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (customer.isFinalMeasurement)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer
-                          .withOpacity(
-                            0.5,
-                          ), // Replaced hardcoded background color
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          FluentIcons.checkmark_circle_24_filled,
-                          size: 16,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary, // Replaced hardcoded icon color
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Final',
-                          style: TextStyle(
-                            color: Color(0xFF047857),
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                if (customer.isFinalMeasurement) _buildFinalBadge(theme),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
+
             // Location
             Row(
               children: [
-                const Icon(
-                  FluentIcons.location_24_regular,
+                AppIcon(
+                  AppIconType.location,
                   size: 16,
-                  color: Colors.grey,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: Text(
                     customer.location,
-                    style: const TextStyle(color: Colors.grey),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
+
             // Stats Row
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
-                    // Windows Count (Optimized: No FutureBuilder)
-                    Icon(
-                      FluentIcons.table_24_regular,
+                    // Windows Count with "X windows" text
+                    AppIcon(
+                      AppIconType.window,
                       size: 18,
-                      color: AppColors.primary,
+                      color: theme.colorScheme.primary,
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: AppSpacing.xs),
                     Text(
-                      '${customer.windowCount}',
-                      style: TextStyle(
+                      '${customer.windowCount} windows',
+                      style: theme.textTheme.labelMedium?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
+                        color: theme.colorScheme.primary,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    // SqFt (Optimized: No FutureBuilder)
-                    Icon(
-                      FluentIcons.ruler_24_regular,
+                    const SizedBox(width: AppSpacing.lg),
+
+                    // SqFt
+                    AppIcon(
+                      AppIconType.measurement,
                       size: 18,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: AppSpacing.xs),
                     Text(
                       '${customer.totalSqFt.toStringAsFixed(1)} sqft',
-                      style: TextStyle(
+                      style: theme.textTheme.labelMedium?.copyWith(
                         fontWeight: FontWeight.w500,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
                       ),
                     ),
                   ],
                 ),
+
                 // Framework Pill
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.xs,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withAlpha(25),
-                    borderRadius: BorderRadius.circular(16),
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
                   ),
                   child: Text(
                     customer.framework,
-                    style: TextStyle(
-                      color: AppColors.primary,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.primary,
                       fontWeight: FontWeight.w600,
-                      fontSize: 13,
                     ),
                   ),
                 ),
@@ -163,6 +139,34 @@ class CustomerCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Fixed green badge - NOT theme dependent
+  Widget _buildFinalBadge(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: _badgeGreen.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle_rounded, size: 14, color: _badgeGreen),
+          const SizedBox(width: 4),
+          Text(
+            'Final',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: _badgeGreen,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

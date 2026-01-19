@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-// import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:animations/animations.dart';
 import 'dart:math' as math;
 
-import '../utils/app_colors.dart';
+import '../ui/components/app_navigation_bar.dart';
+import '../ui/design_system.dart';
 import '../utils/haptics.dart';
 import '../utils/fast_page_route.dart';
 import 'measurement_list_screen.dart';
@@ -28,6 +28,13 @@ class _MainScreenState extends State<MainScreen>
   late AnimationController _fabController;
   late Animation<double> _fabAnimation;
 
+  static const List<Widget> _screens = [
+    MeasurementListScreen(),
+    EnquiryListScreen(),
+    WorkAgreementScreen(),
+    SettingsScreen(),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -50,9 +57,8 @@ class _MainScreenState extends State<MainScreen>
   void _onItemTapped(int index) {
     if (_selectedIndex != index) {
       Haptics.light();
-      setState(() {
-        _selectedIndex = index;
-      });
+      _closeFab();
+      setState(() => _selectedIndex = index);
     }
   }
 
@@ -91,21 +97,15 @@ class _MainScreenState extends State<MainScreen>
 
   void _navigateToCreateEnquiry() {
     _closeFab();
-    // Assuming permission check is similar or same
     Navigator.push(context, FastPageRoute(page: const CreateEnquiryScreen()));
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> screens = [
-      const MeasurementListScreen(),
-      const EnquiryListScreen(),
-      const WorkAgreementScreen(),
-      const SettingsScreen(),
-    ];
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: PageTransitionSwitcher(
         duration: const Duration(milliseconds: 300),
         reverse: false,
@@ -116,57 +116,22 @@ class _MainScreenState extends State<MainScreen>
             child: child,
           );
         },
-        child: screens[_selectedIndex],
+        child: _screens[_selectedIndex],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _onItemTapped,
-        backgroundColor: Colors.white,
-        elevation: 4,
-        shadowColor: Colors.black.withValues(alpha: 0.1),
-        surfaceTintColor: Colors.white,
-        indicatorColor: AppColors.primary.withValues(alpha: 0.15),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.square_foot_outlined),
-            selectedIcon: Icon(
-              Icons.square_foot_rounded,
-              color: AppColors.primary,
-            ),
-            label: 'Measurement',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.assignment_outlined),
-            selectedIcon: Icon(
-              Icons.assignment_rounded,
-              color: AppColors.primary,
-            ),
-            label: 'Enquiry',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.handshake_outlined),
-            selectedIcon: Icon(
-              Icons.handshake_rounded,
-              color: AppColors.primary,
-            ),
-            label: 'Agreement',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(
-              Icons.settings_rounded,
-              color: AppColors.primary,
-            ),
-            label: 'Settings',
-          ),
-        ],
+      bottomNavigationBar: AppNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
       ),
-      floatingActionButton: _buildExpandableFab(),
+      floatingActionButton: _buildExpandableFab(context),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
-  Widget _buildExpandableFab() {
+  Widget _buildExpandableFab(BuildContext context) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+    final surfaceColor = theme.colorScheme.surface;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -176,37 +141,40 @@ class _MainScreenState extends State<MainScreen>
           scale: _fabAnimation,
           alignment: Alignment.bottomCenter,
           child: Padding(
-            padding: const EdgeInsets.only(bottom: 16.0),
+            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
+                        color: Colors.black.withValues(alpha: 0.08),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
                     ],
                   ),
-                  child: const Text(
+                  child: Text(
                     'New Enquiry',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.md),
                 FloatingActionButton.small(
                   heroTag: 'create_enquiry',
                   onPressed: _navigateToCreateEnquiry,
-                  backgroundColor: AppColors.primary,
-                  child: const Icon(Icons.assignment_add, color: Colors.white),
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  child: const Icon(Icons.assignment_add),
                 ),
               ],
             ),
@@ -218,37 +186,40 @@ class _MainScreenState extends State<MainScreen>
           scale: _fabAnimation,
           alignment: Alignment.bottomCenter,
           child: Padding(
-            padding: const EdgeInsets.only(bottom: 16.0),
+            padding: const EdgeInsets.only(bottom: AppSpacing.lg),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.sm,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
+                    color: surfaceColor,
+                    borderRadius: BorderRadius.circular(AppRadius.sm),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
+                        color: Colors.black.withValues(alpha: 0.08),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
                     ],
                   ),
-                  child: const Text(
+                  child: Text(
                     'Measurement',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.md),
                 FloatingActionButton.small(
                   heroTag: 'create_measurement',
                   onPressed: _navigateToCreateMeasurement,
-                  backgroundColor: AppColors.primary,
-                  child: const Icon(Icons.add_box_rounded, color: Colors.white),
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  child: const Icon(Icons.add_box_rounded),
                 ),
               ],
             ),
@@ -259,16 +230,18 @@ class _MainScreenState extends State<MainScreen>
         FloatingActionButton(
           heroTag: 'main_fab',
           onPressed: _toggleFab,
-          backgroundColor: _isFabExpanded ? Colors.white : AppColors.primary,
+          backgroundColor: _isFabExpanded ? surfaceColor : primaryColor,
+          foregroundColor: _isFabExpanded ? primaryColor : Colors.white,
+          elevation: _isFabExpanded ? 2 : 4,
           child: AnimatedBuilder(
             animation: _fabAnimation,
             builder: (context, child) {
               return Transform.rotate(
-                angle: _fabAnimation.value * math.pi * 0.75, // Rotate to X
+                angle: _fabAnimation.value * math.pi * 0.75,
                 child: Icon(
                   Icons.add_rounded,
                   size: 32,
-                  color: _isFabExpanded ? AppColors.primary : Colors.white,
+                  color: _isFabExpanded ? primaryColor : Colors.white,
                 ),
               );
             },

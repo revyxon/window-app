@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:intl/intl.dart';
 import '../models/customer.dart';
 import '../models/window.dart';
 import '../providers/app_provider.dart';
+import '../providers/settings_provider.dart';
+import '../ui/components/app_card.dart';
+import '../ui/components/app_icon.dart';
+import '../ui/design_system.dart';
 import 'window_input_screen.dart';
 import 'add_customer_screen.dart';
 import '../utils/window_calculator.dart';
@@ -14,7 +17,6 @@ import '../utils/haptics.dart';
 import '../utils/window_types.dart';
 import '../utils/fast_page_route.dart';
 import '../widgets/skeleton_loader.dart';
-import '../utils/app_colors.dart';
 import '../services/permission_helper.dart';
 
 class CustomerDetailScreen extends StatefulWidget {
@@ -40,184 +42,601 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     _customer = widget.customer;
   }
 
-  String _formatINR(double amount) {
-    return _inrFormat.format(amount);
+  String _formatINR(double amount) => _inrFormat.format(amount);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final settings = context.watch<SettingsProvider>();
+
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: Consumer<AppProvider>(
+        builder: (context, provider, child) {
+          return FutureBuilder<List<Window>>(
+            future: provider.getWindows(_customer.id!),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const _LoadingSkeleton();
+              }
+
+              final windows = snapshot.data ?? [];
+              final totalSqFt = windows.fold(
+                0.0,
+                (sum, w) => sum + (w.width * w.height / 90903.0 * w.quantity),
+              );
+              final totalRate = (_customer.ratePerSqft ?? 0) * totalSqFt;
+
+              return CustomScrollView(
+                slivers: [
+                  // Modern App Bar
+                  SliverAppBar(
+                    pinned: true,
+                    toolbarHeight: 56,
+                    backgroundColor: theme.scaffoldBackgroundColor,
+                    surfaceTintColor: Colors.transparent,
+                    leading: IconButton(
+                      icon: AppIcon(
+                        AppIconType.back,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    title: Text(
+                      _customer.name,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    actions: [
+                      IconButton(
+                        icon: AppIcon(
+                          AppIconType.share,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        onPressed: () => _showShare(windows),
+                      ),
+                      IconButton(
+                        icon: AppIcon(
+                          AppIconType.print,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        onPressed: () => _showPrint(windows),
+                      ),
+                      IconButton(
+                        icon: AppIcon(
+                          AppIconType.more,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        onPressed: () => _showOptionsMenu(context),
+                      ),
+                    ],
+                  ),
+
+                  SliverPadding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        // Customer Info Card
+                        _buildInfoCard(
+                          theme,
+                          isDark,
+                          windows,
+                          totalSqFt,
+                          totalRate,
+                        ),
+
+                        const SizedBox(height: AppSpacing.xl),
+
+                        // Final Measurement Badge
+                        if (_customer.isFinalMeasurement)
+                          _buildFinalBadge(theme),
+
+                        // Windows Section Header
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Windows',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: () => _editWindows(),
+                              icon: AppIcon(
+                                AppIconType.edit,
+                                size: 18,
+                                color: theme.colorScheme.primary,
+                              ),
+                              label: Text(
+                                'Edit',
+                                style: TextStyle(
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: AppSpacing.md),
+
+                        // Windows List
+                        if (windows.isEmpty)
+                          _buildEmptyState(theme)
+                        else
+                          ...windows.asMap().entries.map(
+                            (e) =>
+                                _buildWindowCard(theme, isDark, e.value, e.key),
+                          ),
+
+                        const SizedBox(height: 80),
+                      ]),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          if (settings.hapticFeedback) Haptics.medium();
+          Navigator.push(
+            context,
+            FastPageRoute(page: WindowInputScreen(customer: _customer)),
+          ).then((_) => setState(() {}));
+        },
+        backgroundColor: theme.colorScheme.primary,
+        child: const AppIcon(AppIconType.add, size: 26, color: Colors.white),
+      ),
+    );
   }
 
-  void _showOptionsMenu(BuildContext context) {
-    Haptics.selection();
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        final bgColor = isDark ? const Color(0xFF1C1C1E) : Colors.white;
-
-        return Container(
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+  Widget _buildInfoCard(
+    ThemeData theme,
+    bool isDark,
+    List<Window> windows,
+    double totalSqFt,
+    double totalRate,
+  ) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Location
+          _InfoRow(
+            icon: AppIconType.location,
+            label: 'Location',
+            value: _customer.location,
           ),
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+
+          if (_customer.phone?.isNotEmpty == true) ...[
+            Divider(
+              height: 28,
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.1),
+            ),
+            _InfoRow(
+              icon: AppIconType.phone,
+              label: 'Phone',
+              value: _customer.phone!,
+            ),
+          ],
+
+          Divider(
+            height: 28,
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.1),
+          ),
+
+          // Framework + Windows + Sqft Row
+          Row(
             children: [
-              _menuItem(
-                context,
-                FluentIcons.edit_24_regular,
-                'Edit Customer',
-                () async {
-                  Navigator.pop(context);
-                  // Check edit_customer permission
-                  if (!PermissionHelper().checkAndShowDialog(
-                    context,
-                    'edit_customer',
-                    'Edit Customer',
-                  )) {
-                    return;
-                  }
-                  // Navigate to edit screen
-                  final updatedCustomer = await Navigator.push<Customer>(
-                    context,
-                    FastPageRoute(
-                      page: AddCustomerScreen(customerToEdit: _customer),
-                    ),
-                  );
-                  // Refresh if customer was updated
-                  if (updatedCustomer != null && mounted) {
-                    setState(() {
-                      _customer = updatedCustomer;
-                    });
-                  }
-                },
+              _MiniStatChip(
+                icon: AppIconType.settings,
+                value: _customer.framework,
+                label: 'Framework',
+                color: theme.colorScheme.primary,
               ),
-              _menuItem(
-                context,
-                FluentIcons.grid_24_regular,
-                'Edit Windows',
-                () {
-                  Navigator.pop(context);
-                  // Check edit_window permission
-                  if (!PermissionHelper().checkAndShowDialog(
-                    context,
-                    'edit_window',
-                    'Edit Windows',
-                  )) {
-                    return;
-                  }
-                  Navigator.push(
-                    context,
-                    FastPageRoute(page: WindowInputScreen(customer: _customer)),
-                  ).then((_) => setState(() {}));
-                },
+              const SizedBox(width: AppSpacing.sm),
+              _MiniStatChip(
+                icon: AppIconType.window,
+                value: '${windows.length}',
+                label: 'Windows',
+                color: theme.colorScheme.primary,
               ),
-              _menuItem(
-                context,
-                FluentIcons.sparkle_24_regular,
-                'Admin Insights',
-                () {
-                  Navigator.pop(context);
-                  _showAdminInsights(context);
-                },
-              ),
-              Divider(
-                color: isDark ? const Color(0xFF3A3A3C) : Colors.grey.shade300,
-              ),
-              _menuItem(
-                context,
-                FluentIcons.delete_24_regular,
-                'Delete Customer',
-                () {
-                  Navigator.pop(context);
-                  // Check delete_customer permission
-                  if (!PermissionHelper().checkAndShowDialog(
-                    context,
-                    'delete_customer',
-                    'Delete Customer',
-                  )) {
-                    return;
-                  }
-                  _showDeleteConfirmation(context);
-                },
-                isDestructive: true,
+              const SizedBox(width: AppSpacing.sm),
+              _MiniStatChip(
+                icon: AppIconType.measurement,
+                value: totalSqFt.toStringAsFixed(1),
+                label: 'Sqft',
+                color: theme.colorScheme.primary,
               ),
             ],
           ),
-        );
-      },
-    );
-  }
 
-  Widget _menuItem(
-    BuildContext context,
-    IconData icon,
-    String label,
-    VoidCallback onTap, {
-    bool isDestructive = false,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final defaultColor = isDark ? Colors.white70 : const Color(0xFF374151);
-    final textColor = isDark ? Colors.white : Colors.black;
-
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isDestructive ? Colors.red : defaultColor,
-        size: 24,
-      ),
-      title: Text(
-        label,
-        style: TextStyle(
-          color: isDestructive ? Colors.red : textColor,
-          fontWeight: FontWeight.w500,
-          fontSize: 16,
-        ),
-      ),
-      onTap: () {
-        Haptics.light();
-        onTap();
-      },
-    );
-  }
-
-  void _showDeleteConfirmation(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Customer?'),
-        content: Text(
-          'Are you sure you want to delete ${_customer.name}? This will also delete all windows.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+          Divider(
+            height: 28,
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.1),
           ),
-          TextButton(
-            onPressed: () async {
-              Haptics.medium();
-              Navigator.pop(context);
-              await Provider.of<AppProvider>(
-                context,
-                listen: false,
-              ).deleteCustomer(_customer.id!);
-              if (mounted) Navigator.pop(context);
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+
+          // Rate & Total
+          Row(
+            children: [
+              AppIcon(
+                AppIconType.calculator,
+                size: 22,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Rate',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.5,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '₹${_customer.ratePerSqft?.toStringAsFixed(0) ?? "0"}/sqft',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Text(
+                  'Total: ${_formatINR(totalRate)}',
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
+  Widget _buildFinalBadge(ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: const Color(0xFF10B981).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF10B981).withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          const AppIcon(AppIconType.check, size: 22, color: Color(0xFF10B981)),
+          const SizedBox(width: AppSpacing.md),
+          Text(
+            'Final Measurement',
+            style: TextStyle(
+              color: const Color(0xFF047857),
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(48),
+      alignment: Alignment.center,
+      child: Column(
+        children: [
+          AppIcon(
+            AppIconType.window,
+            size: 56,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            'No windows added yet',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWindowCard(
+    ThemeData theme,
+    bool isDark,
+    Window window,
+    int index,
+  ) {
+    final rate = _customer.ratePerSqft ?? 0;
+    final displayedSqFt =
+        (window.width * window.height / 90903.0) * window.quantity;
+    final cost = displayedSqFt * rate;
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 150 + (index * 30).clamp(0, 200)),
+      curve: Curves.easeOut,
+      builder: (context, value, child) => Transform.translate(
+        offset: Offset(0, 12 * (1 - value)),
+        child: Opacity(opacity: value, child: child),
+      ),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isDark ? theme.colorScheme.surface : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(
+              alpha: isDark ? 0.15 : 0.08,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            // W1, W2 Badge - circular like screenshot
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(22),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                window.name,
+                style: TextStyle(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            // Dimensions + Type
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${window.width.toStringAsFixed(0)} × ${window.height.toStringAsFixed(0)} mm',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      // Type pill
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withValues(
+                            alpha: 0.08,
+                          ),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          window.type,
+                          style: TextStyle(
+                            color: theme.colorScheme.primary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        WindowType.getName(window.type),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Sqft + Cost on right
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '${displayedSqFt.toStringAsFixed(2)} sqft',
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Rs.${cost.toStringAsFixed(0)}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showShare(List<Window> windows) {
+    Haptics.light();
+    showShareBottomSheet(context, _customer, windows);
+  }
+
+  void _showPrint(List<Window> windows) {
+    Haptics.light();
+    showPrintBottomSheet(context, _customer, windows);
+  }
+
+  void _editWindows() {
+    Haptics.light();
+    if (!PermissionHelper().checkAndShowDialog(
+      context,
+      'edit_window',
+      'Edit Windows',
+    ))
+      return;
+    Navigator.push(
+      context,
+      FastPageRoute(page: WindowInputScreen(customer: _customer)),
+    ).then((_) => setState(() {}));
+  }
+
+  void _showOptionsMenu(BuildContext context) {
+    final theme = Theme.of(context);
+    Haptics.selection();
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      backgroundColor: theme.colorScheme.surface,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _MenuTile(
+                icon: AppIconType.edit,
+                label: 'Edit Customer',
+                onTap: () => _editCustomer(context),
+              ),
+              _MenuTile(
+                icon: AppIconType.window,
+                label: 'Edit Windows',
+                onTap: () {
+                  Navigator.pop(context);
+                  _editWindows();
+                },
+              ),
+              _MenuTile(
+                icon: AppIconType.sparkle,
+                label: 'Admin Insights',
+                onTap: () {
+                  Navigator.pop(context);
+                  _showAdminInsights(context);
+                },
+              ),
+              Divider(
+                height: 24,
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.1),
+              ),
+              _MenuTile(
+                icon: AppIconType.delete,
+                label: 'Delete Customer',
+                isDestructive: true,
+                onTap: () => _deleteCustomer(context),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _editCustomer(BuildContext context) async {
+    Navigator.pop(context);
+    if (!PermissionHelper().checkAndShowDialog(
+      context,
+      'edit_customer',
+      'Edit Customer',
+    ))
+      return;
+    final updated = await Navigator.push<Customer>(
+      context,
+      FastPageRoute(page: AddCustomerScreen(customerToEdit: _customer)),
+    );
+    if (updated != null && mounted) setState(() => _customer = updated);
+  }
+
+  Future<void> _deleteCustomer(BuildContext context) async {
+    Navigator.pop(context);
+    if (!PermissionHelper().checkAndShowDialog(
+      context,
+      'delete_customer',
+      'Delete Customer',
+    ))
+      return;
+    final confirmed =
+        await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Delete Customer?'),
+            content: Text('Are you sure you want to delete ${_customer.name}?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (confirmed && mounted) {
+      await Provider.of<AppProvider>(
+        context,
+        listen: false,
+      ).deleteCustomer(_customer.id!);
+      if (mounted) Navigator.pop(context);
+    }
+  }
+
   void _showAdminInsights(BuildContext context) {
+    final theme = Theme.of(context);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -226,22 +645,177 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         minChildSize: 0.5,
         maxChildSize: 0.95,
         expand: false,
-        builder: (context, scrollController) =>
-            _buildAdminInsightsSheet(scrollController),
+        builder: (context, scrollController) => _AdminInsightsSheet(
+          customer: _customer,
+          scrollController: scrollController,
+        ),
       ),
     );
   }
+}
 
-  Widget _buildAdminInsightsSheet(ScrollController scrollController) {
+// =============================================================================
+// HELPER WIDGETS
+// =============================================================================
+
+class _LoadingSkeleton extends StatelessWidget {
+  const _LoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: List.generate(3, (i) => const SkeletonWindowCard()),
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final AppIconType icon;
+  final String label;
+  final String value;
+
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        AppIcon(
+          icon,
+          size: 22,
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+            Text(
+              value,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniStatChip extends StatelessWidget {
+  final AppIconType icon;
+  final String value;
+  final String label;
+  final Color color;
+
+  const _MiniStatChip({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          children: [
+            AppIcon(icon, size: 20, color: color),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuTile extends StatelessWidget {
+  final AppIconType icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool isDestructive;
+
+  const _MenuTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.isDestructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = isDestructive ? Colors.red : theme.colorScheme.onSurface;
+    return ListTile(
+      leading: AppIcon(icon, size: 24, color: color),
+      title: Text(
+        label,
+        style: TextStyle(color: color, fontWeight: FontWeight.w500),
+      ),
+      onTap: () {
+        Haptics.light();
+        onTap();
+      },
+    );
+  }
+}
+
+class _AdminInsightsSheet extends StatelessWidget {
+  final Customer customer;
+  final ScrollController scrollController;
+
+  const _AdminInsightsSheet({
+    required this.customer,
+    required this.scrollController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Consumer<AppProvider>(
-      builder: (context, provider, child) {
+      builder: (context, provider, _) {
         return FutureBuilder<List<Window>>(
-          future: provider.getWindows(_customer.id!),
+          future: provider.getWindows(customer.id!),
           builder: (context, snapshot) {
             final windows = snapshot.data ?? [];
             final totalQty = windows.fold(0, (sum, w) => sum + w.quantity);
 
-            // Displayed sqft
             final displayedSqFt = windows.fold(
               0.0,
               (sum, w) =>
@@ -255,7 +829,6 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                     isFormulaA: w.formula == 'A' || w.formula == null,
                   ),
             );
-            // Actual sqft
             final actualSqFt = windows.fold(
               0.0,
               (sum, w) =>
@@ -270,947 +843,296 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                   ),
             );
 
-            final avgPerWindow = windows.isNotEmpty
-                ? displayedSqFt / windows.length
-                : 0.0;
             final extraGiven = displayedSqFt - actualSqFt;
             final bonusPercent = actualSqFt > 0
                 ? (extraGiven / actualSqFt * 100)
                 : 0.0;
-
-            final rate = _customer.ratePerSqft ?? 0;
+            final rate = customer.ratePerSqft ?? 0;
             final chargedAmount = displayedSqFt * rate;
             final actualWorth = actualSqFt * rate;
             final customerBenefit = chargedAmount - actualWorth;
 
-            // Additional analytics
-            final avgDimension = windows.isNotEmpty
-                ? windows.fold(
-                        0.0,
-                        (sum, w) => sum + (w.width + w.height) / 2,
-                      ) /
-                      windows.length
-                : 0.0;
-            final largestWindow = windows.isNotEmpty
-                ? windows.reduce(
-                    (a, b) =>
-                        (a.width * a.height) > (b.width * b.height) ? a : b,
-                  )
-                : null;
-            final smallestWindow = windows.isNotEmpty
-                ? windows.reduce(
-                    (a, b) =>
-                        (a.width * a.height) < (b.width * b.height) ? a : b,
-                  )
-                : null;
-
-            return Container(
+            return ListView(
+              controller: scrollController,
               padding: const EdgeInsets.all(20),
-              child: ListView(
-                controller: scrollController,
-                children: [
-                  // Handle bar
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Header
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEDE9FE),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          FluentIcons.sparkle_24_filled,
-                          color: Color(0xFF7C3AED),
-                          size: 26,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Admin Insights',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          Text(
-                            _customer.name,
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Quick Stats Row
-                  Row(
-                    children: [
-                      _insightStatBox(
-                        FluentIcons.window_24_regular,
-                        '${windows.length}',
-                        'Windows',
-                      ),
-                      const SizedBox(width: 12),
-                      _insightStatBox(
-                        FluentIcons.copy_24_regular,
-                        '$totalQty',
-                        'Total Qty',
-                      ),
-                      const SizedBox(width: 12),
-                      _insightStatBox(
-                        FluentIcons.ruler_24_regular,
-                        avgPerWindow.toStringAsFixed(2),
-                        'Avg Sqft',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // SQFT Analysis Card
-                  _analysisCard(
-                    icon: FluentIcons.table_24_filled,
-                    title: 'SQFT ANALYSIS',
-                    titleColor: AppColors.primary,
-                    children: [
-                      _analysisRow(
-                        'Displayed to Customer',
-                        '${displayedSqFt.toStringAsFixed(2)} sqft',
-                        AppColors.primary,
-                      ),
-                      _analysisRow(
-                        'Actual (Real Formula)',
-                        '${actualSqFt.toStringAsFixed(2)} sqft',
-                        const Color(0xFFF59E0B),
-                      ),
-                      const Divider(height: 24),
-                      _analysisRow(
-                        'Extra Given',
-                        '+${extraGiven.toStringAsFixed(2)} sqft',
-                        AppColors.success,
-                        icon: FluentIcons.add_circle_24_regular,
-                      ),
-                      _analysisRow(
-                        'Bonus %',
-                        '+${bonusPercent.toStringAsFixed(2)}%',
-                        AppColors.success,
-                        icon: FluentIcons.arrow_trending_24_regular,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Cost Analysis Card
-                  _analysisCard(
-                    icon: FluentIcons.money_24_filled,
-                    title: 'COST ANALYSIS',
-                    titleColor: const Color(0xFFF59E0B),
-                    children: [
-                      _analysisRow(
-                        'Rate per Sqft',
-                        _formatINR(rate),
-                        Colors.black87,
-                      ),
-                      _analysisRow(
-                        'Charged Amount',
-                        _formatINR(chargedAmount),
-                        AppColors.primary,
-                      ),
-                      _analysisRow(
-                        'Actual Worth',
-                        _formatINR(actualWorth),
-                        const Color(0xFFF59E0B),
-                      ),
-                      const Divider(height: 24),
-                      _analysisRow(
-                        'Customer Benefit',
-                        _formatINR(customerBenefit),
-                        AppColors.success,
-                        icon: FluentIcons.gift_24_regular,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Window Details Card
-                  if (windows.isNotEmpty)
-                    _analysisCard(
-                      icon: FluentIcons.data_bar_vertical_24_filled,
-                      title: 'WINDOW ANALYTICS',
-                      titleColor: const Color(0xFF8B5CF6),
-                      children: [
-                        _analysisRow(
-                          'Total Windows',
-                          '${windows.length}',
-                          Colors.black87,
-                        ),
-                        _analysisRow(
-                          'Total Pieces (Qty)',
-                          '$totalQty',
-                          Colors.black87,
-                        ),
-                        _analysisRow(
-                          'Avg Dimension',
-                          '${avgDimension.toStringAsFixed(0)} mm',
-                          Colors.black87,
-                        ),
-                        if (largestWindow != null)
-                          _analysisRow(
-                            'Largest Window',
-                            '${largestWindow.name} (${largestWindow.width.toStringAsFixed(0)}×${largestWindow.height.toStringAsFixed(0)})',
-                            AppColors.primary,
-                          ),
-                        if (smallestWindow != null)
-                          _analysisRow(
-                            'Smallest Window',
-                            '${smallestWindow.name} (${smallestWindow.width.toStringAsFixed(0)}×${smallestWindow.height.toStringAsFixed(0)})',
-                            const Color(0xFFF59E0B),
-                          ),
-                      ],
-                    ),
-                  const SizedBox(height: 16),
-
-                  // Formula Info Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
+              children: [
+                // Handle
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
                     decoration: BoxDecoration(
-                      color: AppColors.cardSurface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border),
+                      color: theme.colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    child: Column(
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Header
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEDE9FE),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const AppIcon(
+                        AppIconType.sparkle,
+                        size: 24,
+                        color: Color(0xFF7C3AED),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Icon(
-                              FluentIcons.info_24_regular,
-                              color: Colors.grey.shade600,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'FORMULA INFO',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        _formulaRow('Our Formula', 'W × H ÷ 90,903'),
-                        const SizedBox(height: 10),
-                        _formulaRow('Real Formula', 'W × H ÷ 92,903'),
-                        const SizedBox(height: 14),
                         Text(
-                          'Customer gets ~${bonusPercent.toStringAsFixed(1)}% extra sqft compared to actual measurement.',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 13,
-                            fontStyle: FontStyle.italic,
+                          'Admin Insights',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          customer.name,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.6,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Quick Stats
+                Row(
+                  children: [
+                    _InsightStat(
+                      icon: AppIconType.window,
+                      value: '${windows.length}',
+                      label: 'Windows',
+                    ),
+                    const SizedBox(width: 12),
+                    _InsightStat(
+                      icon: AppIconType.customer,
+                      value: '$totalQty',
+                      label: 'Total Qty',
+                    ),
+                    const SizedBox(width: 12),
+                    _InsightStat(
+                      icon: AppIconType.measurement,
+                      value: (displayedSqFt / windows.length.clamp(1, 999))
+                          .toStringAsFixed(1),
+                      label: 'Avg Sqft',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // SQFT Analysis
+                _AnalysisCard(
+                  title: 'SQFT ANALYSIS',
+                  titleColor: theme.colorScheme.primary,
+                  children: [
+                    _AnalysisRow(
+                      label: 'Displayed to Customer',
+                      value: '${displayedSqFt.toStringAsFixed(2)} sqft',
+                      color: theme.colorScheme.primary,
+                    ),
+                    _AnalysisRow(
+                      label: 'Actual (Real)',
+                      value: '${actualSqFt.toStringAsFixed(2)} sqft',
+                      color: const Color(0xFFF59E0B),
+                    ),
+                    Divider(
+                      height: 20,
+                      color: theme.colorScheme.outlineVariant.withValues(
+                        alpha: 0.1,
+                      ),
+                    ),
+                    _AnalysisRow(
+                      label: 'Extra Given',
+                      value: '+${extraGiven.toStringAsFixed(2)} sqft',
+                      color: const Color(0xFF10B981),
+                    ),
+                    _AnalysisRow(
+                      label: 'Bonus %',
+                      value: '+${bonusPercent.toStringAsFixed(1)}%',
+                      color: const Color(0xFF10B981),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Cost Analysis
+                _AnalysisCard(
+                  title: 'COST ANALYSIS',
+                  titleColor: const Color(0xFFF59E0B),
+                  children: [
+                    _AnalysisRow(
+                      label: 'Rate per Sqft',
+                      value: '₹${rate.toStringAsFixed(0)}',
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    _AnalysisRow(
+                      label: 'Charged Amount',
+                      value: '₹${chargedAmount.toStringAsFixed(0)}',
+                      color: theme.colorScheme.primary,
+                    ),
+                    _AnalysisRow(
+                      label: 'Actual Worth',
+                      value: '₹${actualWorth.toStringAsFixed(0)}',
+                      color: const Color(0xFFF59E0B),
+                    ),
+                    Divider(
+                      height: 20,
+                      color: theme.colorScheme.outlineVariant.withValues(
+                        alpha: 0.1,
+                      ),
+                    ),
+                    _AnalysisRow(
+                      label: 'Customer Benefit',
+                      value: '₹${customerBenefit.toStringAsFixed(0)}',
+                      color: const Color(0xFF10B981),
+                    ),
+                  ],
+                ),
+              ],
             );
           },
         );
       },
     );
   }
+}
 
-  Widget _insightStatBox(IconData icon, String value, String label) {
+class _InsightStat extends StatelessWidget {
+  final AppIconType icon;
+  final String value;
+  final String label;
+
+  const _InsightStat({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 18),
+        padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.cardSurface,
+          color: theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
         ),
         child: Column(
           children: [
-            Icon(icon, color: Colors.grey.shade600, size: 24),
-            const SizedBox(height: 10),
+            AppIcon(icon, size: 20, color: theme.colorScheme.primary),
+            const SizedBox(height: 6),
             Text(
               value,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: theme.colorScheme.onSurface,
+              ),
             ),
-            const SizedBox(height: 4),
             Text(
               label,
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
             ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _analysisCard({
-    required IconData icon,
-    required String title,
-    required Color titleColor,
-    required List<Widget> children,
-  }) {
+class _AnalysisCard extends StatelessWidget {
+  final String title;
+  final Color titleColor;
+  final List<Widget> children;
+
+  const _AnalysisCard({
+    required this.title,
+    required this.titleColor,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? theme.colorScheme.surface : Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(
+            alpha: isDark ? 0.15 : 0.08,
           ),
-        ],
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, color: titleColor, size: 22),
-              const SizedBox(width: 10),
-              Text(
-                title,
-                style: TextStyle(
-                  color: titleColor,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ],
+          Text(
+            title,
+            style: TextStyle(
+              color: titleColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              letterSpacing: 0.5,
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           ...children,
         ],
       ),
     );
   }
+}
 
-  Widget _analysisRow(
-    String label,
-    String value,
-    Color valueColor, {
-    IconData? icon,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 18, color: valueColor),
-            const SizedBox(width: 8),
-          ],
-          Text(label, style: const TextStyle(fontSize: 15)),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              color: valueColor,
-              fontWeight: FontWeight.w600,
-              fontSize: 15,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+class _AnalysisRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
 
-  Widget _formulaRow(String label, String formula) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 14)),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            formula,
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey.shade700,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  const _AnalysisRow({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black, size: 24),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          _customer.name,
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(
-              FluentIcons.share_24_regular,
-              color: Colors.black,
-              size: 24,
-            ),
-            onPressed: () {
-              Haptics.light();
-              if (_customer.id != null) {
-                // Fetch windows and show share sheet
-                Provider.of<AppProvider>(
-                  context,
-                  listen: false,
-                ).getWindows(_customer.id!).then((windows) {
-                  if (mounted)
-                    showShareBottomSheet(context, _customer, windows);
-                });
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(
-              FluentIcons.print_24_regular,
-              color: Colors.black,
-              size: 24,
-            ),
-            onPressed: () {
-              Haptics.light();
-              if (_customer.id != null) {
-                Provider.of<AppProvider>(
-                  context,
-                  listen: false,
-                ).getWindows(_customer.id!).then((windows) {
-                  if (mounted)
-                    showPrintBottomSheet(context, _customer, windows);
-                });
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(
-              FluentIcons.more_vertical_24_regular,
-              color: Colors.black,
-              size: 24,
-            ),
-            onPressed: () => _showOptionsMenu(context),
-          ),
-        ],
-      ),
-      body: Consumer<AppProvider>(
-        builder: (context, provider, child) {
-          return FutureBuilder<List<Window>>(
-            future: provider.getWindows(_customer.id!),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: List.generate(
-                      3,
-                      (index) => const SkeletonWindowCard(),
-                    ),
-                  ),
-                );
-              }
-
-              final windows = snapshot.data ?? [];
-              final totalSqFt = windows.fold(
-                0.0,
-                (sum, w) => sum + (w.width * w.height / 90903.0 * w.quantity),
-              );
-              final totalRate = (_customer.ratePerSqft ?? 0) * totalSqFt;
-
-              return SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Customer Info Card
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: AppColors.cardSurface,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _infoRow(
-                            FluentIcons.location_24_regular,
-                            'Location',
-                            _customer.location,
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            child: Divider(
-                              height: 1,
-                              color: Colors.grey.shade300,
-                            ),
-                          ),
-                          if (_customer.phone?.isNotEmpty == true) ...[
-                            _infoRow(
-                              FluentIcons.call_24_regular,
-                              'Phone',
-                              _customer.phone!,
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              child: Divider(
-                                height: 1,
-                                color: Colors.grey.shade300,
-                              ),
-                            ),
-                          ],
-                          Row(
-                            children: [
-                              _statChip(
-                                FluentIcons.wrench_24_regular,
-                                _customer.framework,
-                                'Framework',
-                              ),
-                              const SizedBox(width: 10),
-                              _statChip(
-                                FluentIcons.grid_24_regular,
-                                '${windows.length}',
-                                'Windows',
-                              ),
-                              const SizedBox(width: 10),
-                              _statChip(
-                                FluentIcons.ruler_24_regular,
-                                totalSqFt.toStringAsFixed(2),
-                                'Total Sqft',
-                              ),
-                            ],
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            child: Divider(
-                              height: 1,
-                              color: Colors.grey.shade300,
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Icon(
-                                FluentIcons.money_24_regular,
-                                color: Colors.grey.shade600,
-                                size: 24,
-                              ),
-                              const SizedBox(width: 12),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Rate',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade500,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  Text(
-                                    '₹${_customer.ratePerSqft?.toStringAsFixed(2) ?? "0.00"}/sqft',
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const Spacer(),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: AppColors.primary,
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: Text(
-                                  'Total: ${_formatINR(totalRate)}',
-                                  style: const TextStyle(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    if (_customer.isFinalMeasurement)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 14,
-                          horizontal: 18,
-                        ),
-                        margin: const EdgeInsets.only(bottom: 24),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFECFDF5),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppColors.success.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          children: const [
-                            Icon(
-                              FluentIcons.checkmark_circle_24_filled,
-                              color: AppColors.success,
-                              size: 24,
-                            ),
-                            SizedBox(width: 12),
-                            Text(
-                              'Final Measurement',
-                              style: TextStyle(
-                                color: Color(0xFF047857),
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Windows',
-                          style: TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        TextButton.icon(
-                          onPressed: () {
-                            Haptics.light();
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    WindowInputScreen(customer: _customer),
-                              ),
-                            ).then((_) => setState(() {}));
-                          },
-                          icon: const Icon(
-                            FluentIcons.edit_24_regular,
-                            size: 20,
-                          ),
-                          label: const Text(
-                            'Edit',
-                            style: TextStyle(fontSize: 16),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    if (windows.isEmpty)
-                      Container(
-                        padding: const EdgeInsets.all(40),
-                        alignment: Alignment.center,
-                        child: Column(
-                          children: [
-                            Icon(
-                              FluentIcons.window_24_regular,
-                              size: 56,
-                              color: Colors.grey.shade300,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No windows added yet',
-                              style: TextStyle(
-                                color: Colors.grey.shade500,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      ...List.generate(windows.length, (index) {
-                        return TweenAnimationBuilder<double>(
-                          tween: Tween(begin: 0.0, end: 1.0),
-                          duration: Duration(
-                            milliseconds: 300 + (index * 50).clamp(0, 500),
-                          ),
-                          curve: Curves.easeOutQuart,
-                          builder: (context, value, child) {
-                            return Transform.translate(
-                              offset: Offset(0, 20 * (1 - value)),
-                              child: Opacity(opacity: value, child: child),
-                            );
-                          },
-                          child: _buildWindowCard(windows[index]),
-                        );
-                      }),
-
-                    const SizedBox(height: 80),
-                  ],
-                ),
-              );
-            },
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Haptics.medium();
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => WindowInputScreen(customer: _customer),
-            ),
-          ).then((_) => setState(() {}));
-        },
-        backgroundColor: AppColors.primary,
-        elevation: 4,
-        child: const Icon(Icons.add, size: 28, color: Colors.white),
-      ),
-    );
-  }
-
-  Widget _infoRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.grey.shade500, size: 24),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
-            ),
-            Text(
-              value,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _statChip(IconData icon, String value, String label) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFEFF6FF),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: AppColors.primary, size: 24),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(
-                color: Color(0xFF2563EB),
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWindowCard(Window window) {
-    final rate = _customer.ratePerSqft ?? 0;
-    // Use displayed sqft formula: W × H ÷ 90,903
-    final displayedSqFt =
-        (window.width * window.height / 90903.0) * window.quantity;
-    final cost = displayedSqFt * rate;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Window Badge
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: const Color(0xFFDBEAFE),
-              borderRadius: BorderRadius.circular(12),
+          Text(label, style: theme.textTheme.bodyMedium),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
             ),
-            alignment: Alignment.center,
-            child: Text(
-              window.name,
-              style: const TextStyle(
-                color: Color(0xFF2563EB),
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ),
-          const SizedBox(width: 14),
-          // Details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  (window.width2 != null && window.width2! > 0)
-                      ? '(${window.width.toStringAsFixed(0)} + ${window.width2!.toStringAsFixed(0)}) × ${window.height.toStringAsFixed(0)} mm'
-                      : '${window.width.toStringAsFixed(0)} × ${window.height.toStringAsFixed(0)} mm',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDBEAFE),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: Text(
-                        window.type,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF2563EB),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    if (window.quantity > 1) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE0E7FF),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        child: Text(
-                          '×${window.quantity}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF4338CA),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(width: 8),
-                    Text(
-                      _getDisplayType(window),
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          // Sqft & Cost
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${displayedSqFt.toStringAsFixed(2)} sqft',
-                style: const TextStyle(
-                  color: Color(0xFF2563EB),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _formatINR(cost),
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
-              ),
-            ],
           ),
         ],
       ),
     );
-  }
-
-  String _getDisplayType(Window window) {
-    String typeName = WindowType.getName(window.type);
-    if (window.customName != null && window.customName!.isNotEmpty) {
-      return '$typeName (${window.customName})';
-    }
-    return typeName;
   }
 }

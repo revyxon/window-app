@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
-import '../providers/settings_provider.dart';
 
-import '../utils/app_colors.dart';
+import '../ui/tokens/spacing.dart';
+import '../ui/design_system.dart';
+import '../ui/components/app_header.dart';
+import '../ui/components/app_icon.dart';
+import '../ui/components/app_search_bar.dart';
 import '../utils/haptics.dart';
 import '../utils/fast_page_route.dart';
 import '../widgets/skeleton_loader.dart';
@@ -14,7 +17,6 @@ import '../services/log_service.dart';
 import '../services/data_import_service.dart';
 import '../models/activity_log.dart';
 import '../widgets/premium_toast.dart';
-import 'package:lottie/lottie.dart';
 import '../utils/globals.dart';
 import 'add_customer_screen.dart';
 
@@ -33,7 +35,6 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
   @override
   void initState() {
     super.initState();
-    // Manual logScreenView removed as handled by LoggingNavigatorObserver
     Future.microtask(() {
       final provider = Provider.of<AppProvider>(context, listen: false);
       provider.loadCustomers();
@@ -41,7 +42,7 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
       // Check for import file from intent
       if (GlobalParams.importFilePath != null) {
         _handleImportAction(context, filePath: GlobalParams.importFilePath);
-        GlobalParams.importFilePath = null; // Clear after handling
+        GlobalParams.importFilePath = null;
       }
     });
   }
@@ -64,7 +65,6 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
 
       if (result['success'] == true) {
         ToastService.show(context, result['message'], isError: false);
-        // Refresh list
         if (mounted) {
           Provider.of<AppProvider>(context, listen: false).loadCustomers();
         }
@@ -82,13 +82,11 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
     super.dispose();
   }
 
-  // Manual sync trigger
   Future<void> _triggerManualSync() async {
     if (_isSyncing) return;
     setState(() => _isSyncing = true);
     Haptics.medium();
 
-    // Log manual sync action
     LogService().logEvent(ActionNames.manualSync, page: ScreenNames.home);
 
     try {
@@ -111,8 +109,10 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Consumer<AppProvider>(
         builder: (context, provider, child) {
           final customers = provider.customers.where((c) {
@@ -122,36 +122,11 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
 
           return CustomScrollView(
             slivers: [
-              // Sticky AppBar with search
-              SliverAppBar(
-                floating: false,
-                pinned: true,
-                elevation: 0,
-                backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-                surfaceTintColor: Colors.transparent,
-                toolbarHeight: 60,
-                title: Row(
-                  children: [
-                    Icon(
-                      Icons.straighten_outlined,
-                      color: Theme.of(context).iconTheme.color,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Measurements',
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 24,
-                            color: Theme.of(
-                              context,
-                            ).textTheme.titleLarge?.color,
-                          ),
-                    ),
-                  ],
-                ),
+              AppHeader(
+                title: 'Measurements',
+                icon: AppIconType.measurement,
                 actions: [
-                  // Manual Sync Button (Cloud icon)
+                  // Sync Button
                   IconButton(
                     icon: _isSyncing
                         ? SizedBox(
@@ -159,38 +134,25 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Theme.of(
-                                context,
-                              ).iconTheme.color?.withOpacity(0.7),
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.6,
+                              ),
                             ),
                           )
                         : Icon(
-                            Icons.cloud_sync_outlined,
-                            color: Theme.of(context).iconTheme.color,
+                            Icons.sync_rounded,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.8,
+                            ),
                           ),
                     onPressed: _triggerManualSync,
-                    tooltip: 'Sync to cloud',
-                  ),
-                  // Theme Toggle
-                  Consumer<SettingsProvider>(
-                    builder: (context, settings, _) => IconButton(
-                      icon: Icon(
-                        settings.isDarkMode
-                            ? Icons.light_mode_outlined
-                            : Icons.dark_mode_outlined,
-                        color: Theme.of(context).iconTheme.color,
-                      ),
-                      onPressed: () {
-                        Haptics.light();
-                        settings.toggleDarkMode();
-                      },
-                    ),
+                    tooltip: 'Sync',
                   ),
                   // Settings
                   IconButton(
                     icon: Icon(
                       Icons.settings_outlined,
-                      color: Theme.of(context).iconTheme.color,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                     ),
                     onPressed: () {
                       Haptics.light();
@@ -199,46 +161,25 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                         FastPageRoute(page: const SettingsScreen()),
                       );
                     },
+                    tooltip: 'Settings',
                   ),
+                  const SizedBox(width: Spacing.xs),
                 ],
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(70),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color:
-                            Theme.of(context).inputDecorationTheme.fillColor ??
-                            Theme.of(context).cardColor,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.outline.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) =>
-                            setState(() => _searchQuery = value),
-                        style: Theme.of(context).textTheme.bodyLarge,
-                        decoration: InputDecoration(
-                          hintText: 'Search customers...',
-                          hintStyle: Theme.of(
-                            context,
-                          ).inputDecorationTheme.hintStyle,
-                          prefixIcon: Icon(
-                            Icons.search_rounded,
-                            color: Theme.of(context).hintColor,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                        ),
-                      ),
-                    ),
+              ),
+
+              // Search Bar (Non-sticky, scrolls with content)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.sm,
+                    AppSpacing.lg,
+                    AppSpacing.lg,
+                  ),
+                  child: AppSearchBar(
+                    controller: _searchController,
+                    onChanged: (value) => setState(() => _searchQuery = value),
+                    hintText: 'Search customers...',
                   ),
                 ),
               ),
@@ -246,7 +187,7 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
               // Content
               if (provider.isLoading)
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (ctx, i) => const SkeletonCustomerCard(),
@@ -255,132 +196,12 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
                   ),
                 )
               else if (customers.isEmpty)
-                SliverFillRemaining(
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Premium Vector Illustration (Lottie)
-                          Lottie.network(
-                            'https://assets9.lottiefiles.com/packages/lf20_sufcnt.json',
-                            height: 220,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                height: 200,
-                                width: 200,
-                                padding: const EdgeInsets.all(40),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(
-                                    alpha: 0.05,
-                                  ),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.folder_open_rounded,
-                                  size: 80,
-                                  color: AppColors.primary.withValues(
-                                    alpha: 0.5,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 32),
-                          Text(
-                            _searchQuery.isEmpty
-                                ? 'No Measurements Yet'
-                                : 'No results found',
-                            style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: -0.5,
-                                ),
-                          ),
-                          const SizedBox(height: 12),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 40),
-                            child: Text(
-                              _searchQuery.isEmpty
-                                  ? 'Create your first customer measurement or import a backup file to get started.'
-                                  : 'We couldn\'t find any customers matching "$_searchQuery". Try a different name.',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.bodyLarge
-                                  ?.copyWith(
-                                    color: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.color
-                                        ?.withValues(alpha: 0.7),
-                                    height: 1.5,
-                                  ),
-                            ),
-                          ),
-                          const SizedBox(height: 32),
-                          if (_searchQuery.isEmpty)
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                OutlinedButton.icon(
-                                  onPressed: () => _handleImportAction(context),
-                                  icon: const Icon(Icons.file_upload_outlined),
-                                  label: const Text('Import JSON'),
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 20,
-                                      vertical: 14,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    side: BorderSide(
-                                      color: Colors.grey.shade300,
-                                    ),
-                                    foregroundColor: AppColors.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                ElevatedButton.icon(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      FastPageRoute(
-                                        page: const AddCustomerScreen(),
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(Icons.add_rounded),
-                                  label: const Text('Create New'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primary,
-                                    foregroundColor: Colors.white,
-                                    elevation: 2,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 20,
-                                      vertical: 14,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    textStyle: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                )
+                SliverFillRemaining(child: _buildEmptyState(context))
               else
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
+                    horizontal: Spacing.lg,
+                    vertical: Spacing.sm,
                   ),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate((context, index) {
@@ -392,6 +213,108 @@ class _MeasurementListScreenState extends State<MeasurementListScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  /// Premium empty state - no external dependencies
+  Widget _buildEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
+    final isSearch = _searchQuery.isNotEmpty;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(Spacing.xxl),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Icon container with subtle background
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isSearch ? Icons.search_off_rounded : Icons.folder_open_rounded,
+                size: 48,
+                color: theme.colorScheme.primary.withValues(alpha: 0.6),
+              ),
+            ),
+            const SizedBox(height: Spacing.xl),
+
+            // Title
+            Text(
+              isSearch ? 'No results found' : 'No Measurements Yet',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(height: Spacing.sm),
+
+            // Description
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.xl),
+              child: Text(
+                isSearch
+                    ? 'Try a different search term'
+                    : 'Create your first customer to get started',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  height: 1.5,
+                ),
+              ),
+            ),
+
+            if (!isSearch) ...[
+              const SizedBox(height: Spacing.xl),
+
+              // Action buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _handleImportAction(context),
+                    icon: const Icon(Icons.file_upload_outlined, size: 18),
+                    label: const Text('Import'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: Spacing.lg,
+                        vertical: Spacing.md,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: Spacing.md),
+                  FilledButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        FastPageRoute(page: const AddCustomerScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('New Customer'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: Spacing.lg,
+                        vertical: Spacing.md,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

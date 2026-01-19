@@ -318,10 +318,6 @@ class DatabaseHelper {
   Future<List<Customer>> readCustomersWithStats() async {
     final db = await instance.database;
     try {
-      /*
-      // Optimized query to get customer details + window count + total area in ONE go.
-      // Updated to include L-Corner Formula A and B logic in SqFt calculation
-      */
       final result = await db.rawQuery('''
         SELECT 
           c.*,
@@ -347,21 +343,55 @@ class DatabaseHelper {
         ORDER BY c.created_at DESC
       ''');
 
-      /*
-      // DEBUG: Log the raw result to check if stats are coming through
-      if (result.isNotEmpty) {
-        await _logger.debug('DB', 'First customer stats', '${result.first}');
-      }
-      */
-
-      return result.map((json) {
-        // The raw query returns columns. Customer.fromMap handles the standard ones.
-        // We ensured fromMap looks for 'window_count' and 'total_sqft'.
-        return Customer.fromMap(json);
-      }).toList();
+      return result.map((json) => Customer.fromMap(json)).toList();
     } catch (e) {
       await _logger.error('DB', 'readCustomersWithStats FAILED', 'error=$e');
       return [];
+    }
+  }
+
+  /// Optimized single customer read with stats
+  Future<Customer?> readCustomerWithStats(String id) async {
+    final db = await instance.database;
+    try {
+      final result = await db.rawQuery(
+        '''
+        SELECT 
+          c.*,
+          COALESCE(SUM(CASE WHEN w.is_deleted = 0 THEN w.quantity ELSE 0 END), 0) as window_count,
+          COALESCE(SUM(
+            CASE 
+              WHEN w.is_deleted = 0 THEN 
+                CASE 
+                  WHEN (w.type = 'LC' OR w.type = 'L-Corner') AND w.width2 IS NOT NULL THEN
+                    CASE 
+                      WHEN w.formula = 'A' THEN ((w.width + w.width2) * w.height * w.quantity) / 90903.0
+                      ELSE ((w.width * w.height) + (w.width2 * w.height)) * w.quantity / 90903.0
+                    END
+                  ELSE (w.width * w.height * w.quantity) / 90903.0
+                END
+              ELSE 0 
+            END
+          ), 0.0) as total_sqft
+        FROM customers c
+        LEFT JOIN windows w ON c.id = w.customer_id
+        WHERE c.id = ? AND c.is_deleted = 0
+        GROUP BY c.id
+      ''',
+        [id],
+      );
+
+      if (result.isNotEmpty) {
+        return Customer.fromMap(result.first);
+      }
+      return null;
+    } catch (e) {
+      await _logger.error(
+        'DB',
+        'readCustomerWithStats FAILED',
+        'id=$id, error=$e',
+      );
+      return null;
     }
   }
 
@@ -737,6 +767,15 @@ class DatabaseHelper {
 
     final db = await instance.database;
     await db.transaction((txn) async {
+      await _logger.info(
+        'DB',
+        'Batch Transaction STARTED',
+        'count=${windows.length}',
+      );
+
+      int inserted = 0;
+      int updated = 0;
+
       for (var window in windows) {
         final map = window.toMap();
         map['updated_at'] = DateTime.now().toIso8601String();
@@ -750,7 +789,15 @@ class DatabaseHelper {
             map['created_at'] = DateTime.now().toIso8601String();
           }
           map['user_id'] = await DeviceIdService.instance.getDeviceId();
-          await txn.insert('windows', map);
+
+          final rowId = await txn.insert('windows', map);
+          inserted++;
+
+          await _logger.debug(
+            'DB',
+            'Batch INSERT',
+            'rowId=$rowId, winId=${map['id']}, custId=${map['customer_id']}',
+          );
         } else {
           // UPDATE
           // Check existing status
@@ -768,14 +815,26 @@ class DatabaseHelper {
           }
           map['sync_status'] = newStatus;
 
-          await txn.update(
+          final count = await txn.update(
             'windows',
             map,
             where: 'id = ?',
             whereArgs: [window.id],
           );
+          updated++;
+          await _logger.debug(
+            'DB',
+            'Batch UPDATE',
+            'count=$count, winId=${map['id']}',
+          );
         }
       }
+
+      await _logger.info(
+        'DB',
+        'Batch Transaction COMPLETED',
+        'inserted=$inserted, updated=$updated',
+      );
     });
   }
 
@@ -931,7 +990,7 @@ class DatabaseHelper {
 
   Future<int> cleanOldActivityLogs() async {
     final db = await instance.database;
-    final cutoff = DateTime.now().subtract(const Duration(days: 7));
+    final cutoff = DateTime.now().subtract(const Duration(days: 1)); // 24 hours
     return await db.delete(
       'activity_logs',
       where: 'sync_status = 0 AND timestamp < ?',

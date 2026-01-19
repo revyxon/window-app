@@ -58,34 +58,40 @@ class LicenseService {
 
   // HARD LOCK: Lock if offline > 7 days
   static const Duration _gracePeriod = Duration(days: 7);
+  static const String _statusKey = 'license_status_v2';
+  static const String _checkKey = 'last_valid_check_v2';
 
-  final List<void Function(LicenseStatus)> _listeners = []; // Callbacks
+  final List<void Function(LicenseStatus)> _listeners = [];
 
   LicenseStatus get status => _status;
-  bool get isLocked => _status.isLocked; // Server enforced lock
+  bool get isLocked => _status.isLocked;
 
   /// Returns determined status based on GRACE PERIOD validity.
   /// If offline and within 7 DAYS -> Active (Session is Valid)
   bool get isSessionValid {
-    if (_status.isLocked) return false; // Server said lock -> Immediate Lock
+    if (_status.isLocked)
+      return false; // Strict Lock: Persists until server unlocks
 
-    // If we never checked, we might allow (first run) or block.
-    // Assuming first run logic is handled separately or treated as 'need check'.
-    // If no check ever, we treat as invalid and force check.
-    if (_lastValidCheck == null) return false;
+    // If never checked, we assume need validation, but don't lock immediately unless enforce strict first run?
+    // User wants "no auto lock". So if null, we allow temporarily or force check depending on policy.
+    // Here we treat null as "Unknown/Active" but request check.
+    if (_lastValidCheck == null) return true;
 
     final diff = DateTime.now().difference(_lastValidCheck!);
-    return diff < _gracePeriod;
+    final isValid = diff < _gracePeriod;
+
+    if (!isValid) {
+      AppLogger().warn('LICENSE', 'Grace period expired. Days: ${diff.inDays}');
+    }
+    return isValid;
   }
 
-  /// Initialize: LOAD CACHE ONLY.
+  /// Initialize: LOAD CACHE IMMEDIATELY.
   Future<void> initialize() async {
     await _loadCachedStatus();
   }
 
-  /// Validate Logic:
-  /// - Only run actual network call if > 8 hours OR force check required.
-  /// - BUT, since SystemGuard calls this on 15s timer explicitly, we run it.
+  /// Validate Logic with Robust Network Handling
   Future<LicenseStatus> validate() async {
     try {
       final deviceStatus = await FirestoreService().getDeviceStatus();
@@ -93,51 +99,51 @@ class LicenseService {
       if (deviceStatus != null) {
         final serverStatus = LicenseStatus.fromJson(deviceStatus);
 
-        // If server explicitly locks, we update immediately
+        // PERSISTENT LOCK: If server says locked, we lock immediately and persist it.
         if (serverStatus.isLocked) {
-          _updateStatus(serverStatus);
+          await _updateStatus(serverStatus);
         }
-        // If server says active, we renew our 7-day lease
+        // UNLOCK / RENEW: If server says active
         else {
-          _lastValidCheck = DateTime.now();
-          _updateStatus(serverStatus);
-          await _cacheStatus();
+          _lastValidCheck = DateTime.now(); // Renew lease
+          await _updateStatus(serverStatus);
+          await _cacheStatus(); // Save new lease
         }
       }
       return _status;
     } catch (e) {
-      AppLogger().error('LICENSE', 'Validation failed (offline?): $e');
-      // On failure, we DO NOT change status.
-      // isSessionValid getter handles the 7-day grace check.
+      AppLogger().error('LICENSE', 'Validation failed: $e');
+      // On failure, DO NOTHING. Keep current state.
+      // isSessionValid will handle the 7-day expiry check.
       return _status;
     }
   }
 
-  void _updateStatus(LicenseStatus newStatus) {
+  Future<void> _updateStatus(LicenseStatus newStatus) async {
     if (_status.status != newStatus.status ||
         _status.lockReason != newStatus.lockReason) {
       _status = newStatus;
       _notifyListeners();
+      await _cacheStatus(); // Persist immediately on change
     }
   }
 
   Future<void> _cacheStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+
+      // Store Status
       Map<String, dynamic> data = {
         'status': _status.status,
         'lockReason': _status.lockReason,
         'licenseExpiry': _status.licenseExpiry?.toIso8601String(),
         'forceCheck': _status.forceCheck,
       };
+      await prefs.setString(_statusKey, jsonEncode(data));
 
-      await prefs.setString('license_data', jsonEncode(data));
-
+      // Store Lease
       if (_lastValidCheck != null) {
-        await prefs.setInt(
-          'last_valid_session',
-          _lastValidCheck!.millisecondsSinceEpoch,
-        );
+        await prefs.setInt(_checkKey, _lastValidCheck!.millisecondsSinceEpoch);
       }
     } catch (e) {
       AppLogger().error('LICENSE', 'Cache error: $e');
@@ -147,8 +153,8 @@ class LicenseService {
   Future<void> _loadCachedStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final licenseData = prefs.getString('license_data');
-      final lastSession = prefs.getInt('last_valid_session');
+      final licenseData = prefs.getString(_statusKey);
+      final lastSession = prefs.getInt(_checkKey);
 
       if (licenseData != null) {
         _status = LicenseStatus.fromJson(jsonDecode(licenseData));
@@ -166,10 +172,20 @@ class LicenseService {
   }
 
   String _getGraceRemaining() {
-    if (_lastValidCheck == null) return "None";
+    if (_lastValidCheck == null) return "First Run";
+    if (_status.isLocked) return "Locked";
+
     final expiry = _lastValidCheck!.add(_gracePeriod);
     final remaining = expiry.difference(DateTime.now());
+    if (remaining.isNegative)
+      return "Expired (${remaining.inDays.abs()} days ago)";
     return "${remaining.inDays}d ${remaining.inHours % 24}h";
+  }
+
+  int get daysUntilExpiry {
+    if (_lastValidCheck == null) return 7;
+    final expiry = _lastValidCheck!.add(_gracePeriod);
+    return expiry.difference(DateTime.now()).inDays;
   }
 
   void addListener(void Function(LicenseStatus) listener) {

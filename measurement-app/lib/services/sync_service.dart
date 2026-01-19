@@ -21,7 +21,7 @@ class SyncService {
   Stream<bool> get isSyncingStream => _syncStatusController.stream;
   String? get lastError => _lastError;
 
-  void initialize() async {
+  Future<void> initialize() async {
     // Run one-time migration to force resync of old Supabase data
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getBool('migrated_to_firebase_reset_v3') != true) {
@@ -59,36 +59,43 @@ class SyncService {
     syncData();
   }
 
-  /// Sync data to Firebase - returns error message if failed, null if success
+  /// Sync data to Firebase - Push only (Local -> Cloud)
   Future<String?> syncData() async {
-    if (_isSyncing) return null; // Silent if already syncing
+    if (_isSyncing) return null;
+
+    // Check connectivity explicitly
+    final connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      return null;
+    }
 
     _lastError = null;
 
     try {
       _isSyncing = true;
       _syncStatusController.add(true);
+      await AppLogger().info('SYNC', 'Starting 5m Sync (Push Only)...');
 
-      // Sync customers
+      // 1. Devices (Registration update)
+      await FirestoreService().updateLastActive();
+
+      // 2. Customers
       await _syncCustomers();
 
-      // Sync windows
+      // 3. Windows
       await _syncWindows();
 
-      // Sync enquiries
+      // 4. Enquiries
       await _syncEnquiries();
 
-      // Sync activity logs (push only - no pull needed)
+      // 5. Activity Logs
       await _syncActivityLogs();
 
-      // Update last active timestamp
-      try {
-        await FirestoreService().updateLastActive();
-      } catch (_) {}
-
-      return null; // Success
+      await AppLogger().info('SYNC', 'Sync Completed Successfully');
+      return null;
     } catch (e) {
       _lastError = e.toString();
+      await AppLogger().error('SYNC', 'Sync Failed', 'error=$e');
       return _lastError;
     } finally {
       _isSyncing = false;
@@ -100,41 +107,15 @@ class SyncService {
     final db = DatabaseHelper.instance;
     final firestore = FirestoreService();
 
-    // PUSH: Get dirty records and upload
-    final dirtyCustomers = await db.getUnsyncedCustomers();
+    final dirty = await db.getUnsyncedCustomers();
+    if (dirty.isNotEmpty) {
+      await AppLogger().debug('SYNC', 'Pushing ${dirty.length} customers');
+      final data = dirty.map((e) => e.toMap()).toList();
+      await firestore.upsertCustomers(data);
 
-    if (dirtyCustomers.isNotEmpty) {
-      final customersMap = dirtyCustomers.map((c) => c.toMap()).toList();
-      try {
-        await firestore.upsertCustomers(customersMap);
-      } catch (e) {
-        await AppLogger().error('SYNC', 'Failed to push customers: $e');
-        rethrow;
+      for (var item in dirty) {
+        if (item.id != null) await db.markCustomerSynced(item.id!);
       }
-
-      // Mark as synced locally
-      for (var c in dirtyCustomers) {
-        if (c.id != null) {
-          await db.markCustomerSynced(c.id!);
-        }
-      }
-    }
-
-    // PULL: Fetch from server (wrapped in try-catch to not block windows sync)
-    try {
-      final remoteCustomers = await firestore.fetchCustomers(
-        since: DateTime.fromMillisecondsSinceEpoch(0),
-      );
-
-      for (var remoteData in remoteCustomers) {
-        try {
-          await db.upsertCustomerFromRemote(remoteData);
-        } catch (e) {
-          await AppLogger().error('SYNC', 'Failed to upsert customer: $e');
-        }
-      }
-    } catch (e) {
-      await AppLogger().error('SYNC', 'Failed to pull customers: $e');
     }
   }
 
@@ -142,108 +123,50 @@ class SyncService {
     final db = DatabaseHelper.instance;
     final firestore = FirestoreService();
 
-    // PUSH
-    final dirtyWindows = await db.getUnsyncedWindows();
+    final dirty = await db.getUnsyncedWindows();
+    if (dirty.isNotEmpty) {
+      await AppLogger().debug('SYNC', 'Pushing ${dirty.length} windows');
+      final data = dirty.map((e) => e.toMap()).toList();
+      await firestore.upsertWindows(data);
 
-    if (dirtyWindows.isNotEmpty) {
-      final windowsMap = dirtyWindows.map((w) => w.toMap()).toList();
-      try {
-        await firestore.upsertWindows(windowsMap);
-      } catch (e) {
-        await AppLogger().error('SYNC', 'Failed to push windows: $e');
-        rethrow;
-      }
-
-      for (var w in dirtyWindows) {
-        if (w.id != null) {
-          await db.markWindowSynced(w.id!);
-        }
+      for (var item in dirty) {
+        if (item.id != null) await db.markWindowSynced(item.id!);
       }
     }
-
-    // PULL (wrapped in try-catch)
-    try {
-      final remoteWindows = await firestore.fetchWindows(
-        since: DateTime.fromMillisecondsSinceEpoch(0),
-      );
-
-      for (var remoteData in remoteWindows) {
-        try {
-          await db.upsertWindowFromRemote(remoteData);
-        } catch (e) {
-          await AppLogger().error('SYNC', 'Failed to upsert window: $e');
-        }
-      }
-    } catch (e) {
-      await AppLogger().error('SYNC', 'Failed to pull windows: $e');
-    }
-
-    // Clean up deleted records that are synced
-    await db.cleanSyncedDeletes();
   }
 
   Future<void> _syncEnquiries() async {
     final db = DatabaseHelper.instance;
     final firestore = FirestoreService();
 
-    // PUSH
-    final dirtyEnquiries = await db.getUnsyncedEnquiries();
+    final dirty = await db.getUnsyncedEnquiries();
+    if (dirty.isNotEmpty) {
+      await AppLogger().debug('SYNC', 'Pushing ${dirty.length} enquiries');
+      final data = dirty.map((e) => e.toMap()).toList();
+      await firestore.upsertEnquiries(data);
 
-    if (dirtyEnquiries.isNotEmpty) {
-      final enquiriesMap = dirtyEnquiries.map((e) => e.toMap()).toList();
-      try {
-        await firestore.upsertEnquiries(enquiriesMap);
-      } catch (e) {
-        await AppLogger().error('SYNC', 'Failed to push enquiries: $e');
-        rethrow;
+      for (var item in dirty) {
+        if (item.id != null) await db.markEnquirySynced(item.id!);
       }
-
-      for (var e in dirtyEnquiries) {
-        if (e.id != null) {
-          await db.markEnquirySynced(e.id!);
-        }
-      }
-    }
-
-    // PULL
-    try {
-      final remoteEnquiries = await firestore.fetchEnquiries(
-        since: DateTime.fromMillisecondsSinceEpoch(0),
-      );
-
-      for (var remoteData in remoteEnquiries) {
-        try {
-          await db.upsertEnquiryFromRemote(remoteData);
-        } catch (e) {
-          await AppLogger().error('SYNC', 'Failed to upsert enquiry: $e');
-        }
-      }
-    } catch (e) {
-      await AppLogger().error('SYNC', 'Failed to pull enquiries: $e');
     }
   }
 
-  /// Sync activity logs to Firebase (push only)
   Future<void> _syncActivityLogs() async {
     final db = DatabaseHelper.instance;
     final firestore = FirestoreService();
 
-    try {
-      final unsyncedLogs = await db.getUnsyncedActivityLogs();
-      if (unsyncedLogs.isEmpty) return;
+    final dirty = await db.getUnsyncedActivityLogs();
+    if (dirty.isNotEmpty) {
+      await AppLogger().debug('SYNC', 'Pushing ${dirty.length} logs');
+      final data = dirty.map((e) => e.toMap()).toList();
+      await firestore.upsertActivityLogs(data);
 
-      final logsMap = unsyncedLogs.map((l) => l.toMap()).toList();
-      await firestore.upsertActivityLogs(logsMap);
-
-      // Mark as synced
-      final ids = unsyncedLogs.map((l) => l.id!).toList();
+      // Batch mark as synced
+      final ids = dirty.map((e) => e.id).whereType<String>().toList();
       await db.markActivityLogsSynced(ids);
 
-      // Clean old synced logs to save space
+      // Cleanup old logs
       await db.cleanOldActivityLogs();
-    } catch (e) {
-      // Don't rethrow - activity log sync failure shouldn't block other syncs
-      await AppLogger().error('SYNC', 'Failed to sync activity logs: $e');
     }
   }
 

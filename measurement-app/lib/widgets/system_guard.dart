@@ -49,7 +49,7 @@ class _SystemGuardState extends State<SystemGuard> with WidgetsBindingObserver {
 
     // 2. Schedule Invisible Check (15s delay)
     // Runs after app has fully loaded and user is interacting
-    _validationTimer = Timer(const Duration(seconds: 15), _runInvisibleCheck);
+    _validationTimer = Timer(const Duration(seconds: 3), _runInvisibleCheck);
 
     // 3. Listen for real-time changes
     LicenseService().addListener(_onLicenseChanged);

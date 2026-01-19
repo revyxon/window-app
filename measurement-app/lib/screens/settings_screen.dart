@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import '../db/database_helper.dart';
 import '../providers/settings_provider.dart';
 import '../providers/app_provider.dart';
 import '../services/device_id_service.dart';
 import '../services/sync_service.dart';
-import '../utils/app_colors.dart';
+import '../ui/design_system.dart';
+// Added import for AppCardStyle
+import '../ui/components/app_icon.dart';
+import '../ui/components/app_header.dart';
+import '../ui/components/settings_section.dart';
+import '../utils/haptics.dart';
 import 'about_screen.dart';
 import 'log_viewer_screen.dart';
+import '../ui/dialogs/restore_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -21,6 +27,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Map<String, dynamic> _dbStats = {};
   bool _isLoading = true;
   String _deviceId = '';
+  String _versionString = '';
 
   @override
   void initState() {
@@ -31,10 +38,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadData() async {
     final stats = await DatabaseHelper.instance.getDatabaseStats();
     final deviceId = await DeviceIdService.instance.getDeviceId();
+    final packageInfo = await PackageInfo.fromPlatform();
     if (mounted) {
       setState(() {
         _dbStats = stats;
         _deviceId = deviceId;
+        _versionString = 'v${packageInfo.version}';
         _isLoading = false;
       });
     }
@@ -42,282 +51,432 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
-    final appBarColor =
-        Theme.of(context).appBarTheme.backgroundColor ?? scaffoldColor;
-    final titleColor = Theme.of(context).brightness == Brightness.dark
-        ? Colors.white
-        : Colors.black;
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: scaffoldColor,
-      appBar: AppBar(
-        title: Text(
-          'Settings',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 24,
-            color: titleColor,
-          ),
-        ),
-        centerTitle: false,
-        backgroundColor: appBarColor,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-      ),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Consumer<SettingsProvider>(
         builder: (context, settings, child) {
-          return ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            children: [
-              _buildSectionHeader('APPEARANCE'),
-              _buildCard(
-                children: [
-                  _buildSettingItem(
-                    icon: FluentIcons.dark_theme_24_regular,
-                    iconColor: Colors.purple,
-                    title: 'Theme',
-                    subtitle: settings.isDarkMode ? 'Dark mode' : 'Light mode',
-                    trailing: Switch.adaptive(
-                      value: settings.isDarkMode,
-                      activeTrackColor: AppColors.primary,
-                      onChanged: (v) => settings.setThemeMode(
-                        v ? ThemeMode.dark : ThemeMode.light,
-                      ),
+          return NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
+              AppHeader(
+                title: 'Settings',
+                actions: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.info_outline_rounded,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
-                  ),
-                  _buildDivider(),
-                  _buildSettingItem(
-                    icon: FluentIcons.text_font_size_24_regular,
-                    iconColor: Colors.blue,
-                    title: 'Text Size',
-                    subtitle: _getTextSizeLabel(settings.textScale),
-                    trailing: SizedBox(
-                      width: 120,
-                      child: SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          trackHeight: 4,
-                          thumbShape: const RoundSliderThumbShape(
-                            enabledThumbRadius: 6,
-                          ),
-                          overlayShape: SliderComponentShape.noOverlay,
-                        ),
-                        child: Slider(
-                          value: settings.textScale,
-                          min: 0.8,
-                          max: 1.4,
-                          divisions: 6,
-                          activeColor: AppColors.primary,
-                          onChanged: (v) => settings.setTextScale(v),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-              _buildSectionHeader('CALCULATION'),
-              _buildCard(
-                children: [
-                  _buildSettingItem(
-                    icon: FluentIcons.calculator_24_regular,
-                    iconColor: Colors.orange,
-                    title: 'Displayed Formula',
-                    subtitle:
-                        'W × H ÷ ${settings.displayedFormula.toStringAsFixed(0)}',
-                    onTap: () => _showFormulaDialog(context, settings, true),
-                  ),
-                  _buildDivider(),
-                  _buildSettingItem(
-                    icon: FluentIcons.math_formula_24_regular,
-                    iconColor: Colors.orange,
-                    title: 'Actual Formula',
-                    subtitle:
-                        'W × H ÷ ${settings.actualFormula.toStringAsFixed(2)}',
-                    onTap: () => _showFormulaDialog(context, settings, false),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-              _buildSectionHeader('DATA'),
-              _buildCard(
-                children: [
-                  _buildSettingItem(
-                    icon: FluentIcons.database_24_regular,
-                    iconColor: Colors.teal,
-                    title: 'Database Stats',
-                    subtitle: _isLoading
-                        ? 'Loading...'
-                        : '${_dbStats['customerCount'] ?? 0} customers, ${_dbStats['windowCount'] ?? 0} windows',
-                    onTap: () {}, // Just display
-                  ),
-                  _buildDivider(),
-                  _buildSettingItem(
-                    icon: FluentIcons.arrow_upload_24_regular,
-                    iconColor: Colors.green,
-                    title: 'Force Resync',
-                    subtitle: 'Re-upload all data to cloud',
-                    onTap: () => _handleForceResync(context),
-                  ),
-                  _buildDivider(),
-                  _buildSettingItem(
-                    icon: FluentIcons.delete_24_regular,
-                    iconColor: Colors.red,
-                    title: 'Clear All Data',
-                    subtitle: 'Delete everything permanently',
-                    onTap: () => _showClearDataDialog(context),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-              _buildSectionHeader('ABOUT'),
-              _buildCard(
-                children: [
-                  _buildSettingItem(
-                    icon: FluentIcons.info_24_regular,
-                    iconColor: Colors.grey,
-                    title: 'About App',
-                    subtitle: 'Version 2.0.0 • Tap to learn more',
-                    onTap: () => Navigator.push(
+                    onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const AboutScreen()),
                     ),
                   ),
-                  _buildDivider(),
-                  _buildSettingItem(
-                    icon: FluentIcons.code_24_regular,
-                    iconColor: Colors.grey,
-                    title: 'Logs',
-                    subtitle: 'View application logs',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const LogViewerScreen(),
-                      ),
-                    ),
-                  ),
-                  _buildDivider(),
-                  _buildSettingItem(
-                    icon: FluentIcons.phone_24_regular,
-                    iconColor: Colors.blueGrey,
-                    title: 'Device ID',
-                    subtitle: _deviceId,
-                    onTap: () {}, // Just display
-                  ),
+                  const SizedBox(width: AppSpacing.xs),
                 ],
               ),
-              const SizedBox(height: 40),
             ],
+            body: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.xl,
+              ),
+              child: Column(
+                children: [
+                  // APPEARANCE
+                  SettingsSection(
+                    title: 'Appearance',
+                    icon: AppIconType.sparkle, // Added icon
+                    children: [
+                      // Theme Mode
+                      _SettingsTile(
+                        icon: AppIconType.theme,
+                        iconColor: theme.colorScheme.primary,
+                        title: 'Theme Mode',
+                        subtitle: _getThemeModeLabel(settings.themeMode),
+                        onTap: () => _showThemeModeSheet(context, settings),
+                      ),
+
+                      // Accent Color
+                      _SettingsTile(
+                        icon: AppIconType.palette,
+                        iconColor: settings.accentColor,
+                        title: 'Accent Color',
+                        subtitle: settings.accentColorName,
+                        trailing: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: settings.accentColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: theme.colorScheme.outline.withValues(
+                                alpha: 0.2,
+                              ),
+                            ),
+                          ),
+                        ),
+                        onTap: () => _showAccentColorSheet(context, settings),
+                      ),
+
+                      // Surface Color
+                      _SettingsTile(
+                        icon: AppIconType.file,
+                        iconColor: theme.colorScheme.onSurface,
+                        title: 'Surface Color',
+                        subtitle: _getSurfaceName(settings.surfaceVariant),
+                        onTap: () => _showSurfaceColorSheet(context, settings),
+                        trailing: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: AppSurfaces.getSurface(
+                              settings.surfaceVariant,
+                            ).background,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: theme.colorScheme.outline.withValues(
+                                alpha: 0.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Icon Pack
+                      _SettingsTile(
+                        icon: AppIconType.icons,
+                        iconColor: Colors.purple,
+                        title: 'Icon Pack',
+                        subtitle: _getIconPackLabel(settings.iconPack),
+                        onTap: () => _showIconPackSheet(context, settings),
+                      ),
+                    ],
+                  ),
+
+                  // TYPOGRAPHY
+                  SettingsSection(
+                    title: 'Typography',
+                    icon: AppIconType.font,
+                    children: [
+                      _SettingsTile(
+                        icon: AppIconType.font,
+                        iconColor: Colors.teal,
+                        title: 'Font Family',
+                        subtitle: settings.fontFamilyDisplayName,
+                        onTap: () => _showFontFamilySheet(context, settings),
+                      ),
+                      // Font Size Slider (Custom Tile)
+                      Padding(
+                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(
+                                      AppRadius.md,
+                                    ),
+                                  ),
+                                  child: const AppIcon(
+                                    AppIconType.textSize,
+                                    color: Colors.blue,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.lg),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Font Size',
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      Text(
+                                        '${(settings.fontSize * 100).toInt()}%',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: theme.colorScheme.primary,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 4,
+                                thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 8,
+                                ),
+                                overlayShape: const RoundSliderOverlayShape(
+                                  overlayRadius: 16,
+                                ),
+                              ),
+                              child: Slider(
+                                value: settings.fontSize,
+                                min: 0.8,
+                                max: 1.3,
+                                divisions: 10,
+                                onChanged: (v) {
+                                  if (settings.hapticFeedback)
+                                    Haptics.selection();
+                                  settings.setFontSize(v);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // FEEDBACK
+                  SettingsSection(
+                    title: 'Behavior',
+                    icon: AppIconType.settings,
+                    children: [
+                      // Haptic Feedback Switch (Custom Tile)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.lg,
+                          vertical: AppSpacing.md,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadius.md,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.vibration_rounded,
+                                color: Colors.orange,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.lg),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Haptic Feedback',
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w600),
+                                  ),
+                                  Text(
+                                    settings.hapticFeedback
+                                        ? 'Enabled'
+                                        : 'Disabled',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurface
+                                          .withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: settings.hapticFeedback,
+                              onChanged: (v) {
+                                if (v) Haptics.medium();
+                                settings.setHapticFeedback(v);
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // DATA
+                  SettingsSection(
+                    title: 'Data',
+                    icon: AppIconType.database,
+                    children: [
+                      _SettingsTile(
+                        icon: AppIconType.database,
+                        iconColor: Colors.teal,
+                        title: 'Database Stats',
+                        subtitle: _isLoading
+                            ? 'Loading...'
+                            : '${_dbStats['customerCount'] ?? 0} customers • ${_dbStats['windowCount'] ?? 0} windows',
+                      ),
+                      _SettingsTile(
+                        icon: AppIconType.download, // Restore Icon
+                        iconColor: Colors.purple,
+                        title: 'Restore Data',
+                        subtitle: 'Download backup from cloud',
+                        onTap: () => _showRestoreDialog(context),
+                      ),
+                      _SettingsTile(
+                        icon: AppIconType.upload,
+                        iconColor: Colors.green,
+                        title: 'Force Resync',
+                        subtitle: 'Re-upload all data to cloud',
+                        onTap: () => _handleForceResync(context),
+                      ),
+                      _SettingsTile(
+                        icon: AppIconType.delete,
+                        iconColor: Colors.red,
+                        title: 'Clear All Data',
+                        subtitle: 'Delete everything permanently',
+                        onTap: () => _showClearDataDialog(context),
+                      ),
+                    ],
+                  ),
+
+                  // ABOUT
+                  SettingsSection(
+                    title: 'About',
+                    icon: AppIconType.info,
+                    children: [
+                      _SettingsTile(
+                        icon: AppIconType.info,
+                        iconColor: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.5,
+                        ),
+                        title: 'About App',
+                        subtitle: _versionString.isNotEmpty
+                            ? '$_versionString • Licenses & more'
+                            : 'Version, licenses & more',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AboutScreen(),
+                          ),
+                        ),
+                      ),
+                      _SettingsTile(
+                        icon: AppIconType.file,
+                        iconColor: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.5,
+                        ),
+                        title: 'Logs',
+                        subtitle: 'View application logs',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const LogViewerScreen(),
+                          ),
+                        ),
+                      ),
+                      _SettingsTile(
+                        icon: AppIconType.device,
+                        iconColor: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.5,
+                        ),
+                        title: 'Device ID',
+                        subtitle: _deviceId,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 80), // Bottom padding
+                ],
+              ),
+            ),
           );
         },
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: AppColors.primary,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
+  // ========== HELPER METHODS ==========
+
+  String _getThemeModeLabel(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Light';
+      case ThemeMode.dark:
+        return 'Dark';
+      case ThemeMode.system:
+        return 'System';
+    }
   }
 
-  Widget _buildCard({required List<Widget> children}) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark
-        ? const Color(0xFF1C1C1E)
-        : Colors.white; // iOS Dark surface or White
-
-    return Container(
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(
-              isDark ? 77 : 13,
-            ), // 0.3 = 77, 0.05 = 13
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(children: children),
-    );
+  String _getIconPackLabel(IconPack pack) {
+    switch (pack) {
+      case IconPack.material:
+        return 'Material Icons';
+      case IconPack.fluent:
+        return 'Fluent Icons';
+      case IconPack.cupertino:
+        return 'Cupertino Icons';
+    }
   }
 
-  Widget _buildSettingItem({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String subtitle,
-    Widget? trailing,
-    VoidCallback? onTap,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark ? Colors.white : const Color(0xFF1F2937);
-    final subtitleColor = isDark ? Colors.grey.shade400 : Colors.grey.shade500;
+  // ========== BOTTOM SHEETS ==========
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+  void _showThemeModeSheet(BuildContext context, SettingsProvider settings) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Row(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: iconColor.withAlpha(26), // 0.1 opacity = 26 alpha
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: iconColor, size: 22),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: titleColor,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: subtitleColor,
-                        height: 1.2,
-                      ),
-                    ),
-                  ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                child: Text(
+                  'Theme Mode',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-              if (trailing != null)
-                trailing
-              else if (onTap != null)
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 16,
-                  color: Colors.grey.shade400,
-                ),
+              const SizedBox(height: AppSpacing.lg),
+              _SheetOption(
+                icon: Icons.light_mode_rounded,
+                title: 'Light',
+                subtitle: 'Always use light theme',
+                isSelected: settings.themeMode == ThemeMode.light,
+                onTap: () {
+                  settings.setThemeMode(ThemeMode.light);
+                  Navigator.pop(context);
+                },
+              ),
+              _SheetOption(
+                icon: Icons.dark_mode_rounded,
+                title: 'Dark',
+                subtitle: 'Always use dark theme',
+                isSelected: settings.themeMode == ThemeMode.dark,
+                onTap: () {
+                  settings.setThemeMode(ThemeMode.dark);
+                  Navigator.pop(context);
+                },
+              ),
+              _SheetOption(
+                icon: Icons.settings_suggest_rounded,
+                title: 'System',
+                subtitle: 'Follow system settings',
+                isSelected: settings.themeMode == ThemeMode.system,
+                onTap: () {
+                  settings.setThemeMode(ThemeMode.system);
+                  Navigator.pop(context);
+                },
+              ),
             ],
           ),
         ),
@@ -325,74 +484,392 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildDivider() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Divider(
-      height: 1,
-      thickness: 1,
-      indent: 68,
-      endIndent: 0,
-      color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
-    );
-  }
-
-  String _getTextSizeLabel(double scale) {
-    if (scale <= 0.85) return 'Small';
-    if (scale <= 0.95) return 'Medium';
-    if (scale <= 1.05) return 'Default';
-    if (scale <= 1.2) return 'Large';
-    return 'Extra Large';
-  }
-
-  void _showFormulaDialog(
-    BuildContext context,
-    SettingsProvider settings,
-    bool isDisplayed,
-  ) {
-    final controller = TextEditingController(
-      text: isDisplayed
-          ? settings.displayedFormula.toStringAsFixed(0)
-          : settings.actualFormula.toStringAsFixed(2),
-    );
-    showDialog(
+  void _showAccentColorSheet(BuildContext context, SettingsProvider settings) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(isDisplayed ? 'Displayed Formula' : 'Actual Formula'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: 'Divisor (W × H ÷ ?)',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Accent Color',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Choose your preferred accent color',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  mainAxisSpacing: AppSpacing.lg,
+                  crossAxisSpacing: AppSpacing.lg,
+                  childAspectRatio: 1,
+                ),
+                itemCount: SettingsProvider.accentColors.length,
+                itemBuilder: (context, i) {
+                  final color = SettingsProvider.accentColors[i];
+                  final name = SettingsProvider.accentColorNames[i];
+                  final isSelected = i == settings.accentColorIndex;
+
+                  return GestureDetector(
+                    onTap: () {
+                      if (settings.hapticFeedback) Haptics.selection();
+                      settings.setAccentColor(i);
+                      Navigator.pop(context);
+                    },
+                    child: Column(
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected
+                                  ? Colors.white
+                                  : Colors.transparent,
+                              width: 3,
+                            ),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: color.withValues(alpha: 0.5),
+                                      blurRadius: 12,
+                                      spreadRadius: 2,
+                                    ),
+                                  ]
+                                : [
+                                    BoxShadow(
+                                      color: color.withValues(alpha: 0.3),
+                                      blurRadius: 8,
+                                    ),
+                                  ],
+                          ),
+                          child: isSelected
+                              ? const Icon(
+                                  Icons.check_rounded,
+                                  color: Colors.white,
+                                  size: 28,
+                                )
+                              : null,
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          name.split(' ').first,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: isSelected
+                                ? color
+                                : theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.6,
+                                  ),
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: AppSpacing.lg),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+      ),
+    );
+  }
+
+  void _showIconPackSheet(BuildContext context, SettingsProvider settings) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                child: Text(
+                  'Icon Pack',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-            ),
-            onPressed: () {
-              final v = double.tryParse(controller.text);
-              if (v != null && v > 0) {
-                isDisplayed
-                    ? settings.setDisplayedFormula(v)
-                    : settings.setActualFormula(v);
-              }
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
+              const SizedBox(height: AppSpacing.lg),
+              _SheetOption(
+                icon: Icons.android_rounded,
+                title: 'Material',
+                subtitle: 'Google Material Design icons',
+                isSelected: settings.iconPack == IconPack.material,
+                onTap: () {
+                  settings.setIconPack(IconPack.material);
+                  Navigator.pop(context);
+                },
+              ),
+              _SheetOption(
+                icon: Icons.window_rounded,
+                title: 'Fluent',
+                subtitle: 'Microsoft Fluent UI icons',
+                isSelected: settings.iconPack == IconPack.fluent,
+                onTap: () {
+                  settings.setIconPack(IconPack.fluent);
+                  Navigator.pop(context);
+                },
+              ),
+              _SheetOption(
+                icon: Icons.apple_rounded,
+                title: 'Cupertino',
+                subtitle: 'Apple San Francisco icons',
+                isSelected: settings.iconPack == IconPack.cupertino,
+                onTap: () {
+                  settings.setIconPack(IconPack.cupertino);
+                  Navigator.pop(context);
+                },
+              ),
+            ],
           ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  void _showSurfaceColorSheet(BuildContext context, SettingsProvider settings) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Surface Color',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Choose your preferred background style',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: AppSpacing.lg,
+                  crossAxisSpacing: AppSpacing.lg,
+                  childAspectRatio: 1.2,
+                ),
+                itemCount: AppSurfaceVariant.values.length,
+                itemBuilder: (context, i) {
+                  final variant = AppSurfaceVariant.values[i];
+                  final surfaceData = AppSurfaces.getSurface(variant);
+                  final isSelected = settings.surfaceVariant == variant;
+
+                  return GestureDetector(
+                    onTap: () {
+                      if (settings.hapticFeedback) Haptics.selection();
+                      settings.setSurfaceVariant(variant);
+                      Navigator.pop(context);
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: surfaceData.background,
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                        border: Border.all(
+                          color: isSelected
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.outline.withValues(
+                                  alpha: 0.2,
+                                ),
+                          width: isSelected ? 2 : 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 4,
+                            spreadRadius: 0,
+                          ),
+                        ],
+                      ),
+                      child: Stack(
+                        children: [
+                          if (isSelected)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Icon(
+                                Icons.check_circle_rounded,
+                                color: theme.colorScheme.primary,
+                                size: 20,
+                              ),
+                            ),
+                          Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  surfaceData.name,
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.w500,
+                                    color: Colors.black87,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showRestoreDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const RestoreDialog(),
+    );
+  }
+
+  String _getSurfaceName(AppSurfaceVariant variant) {
+    return AppSurfaces.getSurface(variant).name;
+  }
+
+  void _showFontFamilySheet(BuildContext context, SettingsProvider settings) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.9,
+        minChildSize: 0.5,
+        expand: false,
+        builder: (context, scrollController) => SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: Text(
+                  'Font Family',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  itemCount: FontFamily.values.length,
+                  itemBuilder: (context, i) {
+                    final family = FontFamily.values[i];
+                    final isSelected = settings.fontFamily == family;
+                    String name;
+                    switch (family) {
+                      case FontFamily.inter:
+                        name = 'Inter';
+                      case FontFamily.roboto:
+                        name = 'Roboto';
+                      case FontFamily.poppins:
+                        name = 'Poppins';
+                      case FontFamily.nunito:
+                        name = 'Nunito';
+                      case FontFamily.lato:
+                        name = 'Lato';
+                      case FontFamily.openSans:
+                        name = 'Open Sans';
+                      case FontFamily.montserrat:
+                        name = 'Montserrat';
+                      case FontFamily.raleway:
+                        name = 'Raleway';
+                      case FontFamily.sourceSans:
+                        name = 'Source Sans';
+                      case FontFamily.ubuntu:
+                        name = 'Ubuntu';
+                    }
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xl,
+                        vertical: AppSpacing.xs,
+                      ),
+                      title: Text(
+                        name,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                          color: isSelected ? theme.colorScheme.primary : null,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'The quick brown fox jumps over the lazy dog',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.5,
+                          ),
+                        ),
+                      ),
+                      trailing: isSelected
+                          ? Icon(
+                              Icons.check_circle_rounded,
+                              color: theme.colorScheme.primary,
+                            )
+                          : null,
+                      onTap: () {
+                        if (settings.hapticFeedback) Haptics.selection();
+                        settings.setFontFamily(family);
+                        Navigator.pop(context);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -401,17 +878,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(FluentIcons.warning_24_filled, color: Colors.red),
-            SizedBox(width: 8),
+            Icon(Icons.warning_rounded, color: Colors.red),
+            SizedBox(width: 12),
             Text('Clear All Data?'),
           ],
         ),
         content: const Text(
-          'This action cannot be undone. All customers, measurements, and logs will be permanently deleted.',
+          'This action cannot be undone. All data will be permanently deleted.',
         ),
         actions: [
           TextButton(
@@ -421,37 +896,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              try {
-                await SyncService().clearCloudData();
-                await DatabaseHelper.instance.clearAllData();
+              await SyncService().clearCloudData();
+              await DatabaseHelper.instance.clearAllData();
+              if (mounted) {
                 await Provider.of<AppProvider>(
                   context,
                   listen: false,
                 ).loadCustomers();
-                _loadData(); // refresh local stats
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('All data cleared'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
+                _loadData();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('All data cleared'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
               }
             },
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-            ),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -462,8 +923,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Force Resync?'),
         content: const Text('This will re-upload all local data to the cloud.'),
         actions: [
@@ -471,7 +930,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Resync'),
           ),
@@ -482,14 +941,160 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (confirmed == true && mounted) {
       await DatabaseHelper.instance.markAllAsUnsynced();
       SyncService().syncData();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Resync started'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Resync started'),
+          backgroundColor: Colors.green,
+        ),
+      );
     }
+  }
+}
+
+// ============================================================================
+// WIDGETS
+// ============================================================================
+
+class _SettingsTile extends StatelessWidget {
+  final AppIconType icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  const _SettingsTile({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    // Using InkWell directly since SettingsSection provides the Card container
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg,
+          vertical: AppSpacing.lg,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: AppIcon(icon, color: iconColor, size: 20),
+            ),
+            const SizedBox(width: AppSpacing.lg),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (trailing != null) ...[
+              const SizedBox(width: AppSpacing.md),
+              trailing!,
+            ] else if (onTap != null) ...[
+              const SizedBox(width: AppSpacing.md),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                size: 20,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetOption extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _SheetOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.xl,
+        vertical: AppSpacing.xs,
+      ),
+      leading: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color:
+              (isSelected
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurface)
+                  .withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Icon(
+          icon,
+          color: isSelected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+        ),
+      ),
+      title: Text(
+        title,
+        style: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          color: isSelected ? theme.colorScheme.primary : null,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+        ),
+      ),
+      trailing: isSelected
+          ? Icon(Icons.check_circle_rounded, color: theme.colorScheme.primary)
+          : null,
+      onTap: onTap,
+    );
   }
 }

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'firestore_service.dart';
+import 'app_logger.dart';
 
 class UpdateService {
   static final UpdateService _instance = UpdateService._internal();
@@ -9,18 +10,31 @@ class UpdateService {
   UpdateService._internal();
 
   final String _baseUrl = 'https://window-license-server.vercel.app';
+  final AppLogger _logger = AppLogger();
 
-  /// Check for updates and return update info if available
+  /// Check for updates with Timeout & Retry Logic
   Future<UpdateCheckResult> checkForUpdate() async {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
 
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/updates/latest'),
-      );
+      // Retry Logic (Max 1 retry)
+      http.Response? response;
+      try {
+        response = await http
+            .get(Uri.parse('$_baseUrl/api/updates/latest'))
+            .timeout(const Duration(seconds: 10)); // 10s Timeout
+      } catch (e) {
+        _logger.warn('UPDATE', 'Check failed (Attempt 1): $e. Retrying...');
+        await Future.delayed(const Duration(seconds: 2));
+        response = await http
+            .get(Uri.parse('$_baseUrl/api/updates/latest'))
+            .timeout(const Duration(seconds: 10));
+      }
+
       if (response.statusCode != 200) {
-        return UpdateCheckResult(hasUpdate: false);
+        _logger.error('UPDATE', 'Server error: ${response.statusCode}');
+        return UpdateCheckResult(hasUpdate: false, error: 'Server unavailable');
       }
 
       final data = jsonDecode(response.body);
@@ -53,6 +67,11 @@ class UpdateService {
       final bool isForceUpdate = update['forceUpdate'] == true;
       final bool skipAllowed = update['skipAllowed'] == true && skipCount < 3;
 
+      _logger.info(
+        'UPDATE',
+        'Update found: $latestVersion (Mandatory: $isForceUpdate)',
+      );
+
       return UpdateCheckResult(
         hasUpdate: true,
         version: latestVersion,
@@ -62,8 +81,9 @@ class UpdateService {
         isMandatory: isForceUpdate || !skipAllowed,
         skipCount: skipCount,
       );
-    } catch (_) {
-      return UpdateCheckResult(hasUpdate: false);
+    } catch (e) {
+      _logger.error('UPDATE', 'Update check failed: $e');
+      return UpdateCheckResult(hasUpdate: false, error: e.toString());
     }
   }
 

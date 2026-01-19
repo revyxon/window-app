@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-// import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import '../models/enquiry.dart';
 import '../providers/app_provider.dart';
 import '../widgets/premium_toast.dart';
+import '../ui/components/app_icon.dart';
 
 class CreateEnquiryScreen extends StatefulWidget {
   const CreateEnquiryScreen({super.key});
@@ -15,7 +15,6 @@ class CreateEnquiryScreen extends StatefulWidget {
 class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _locationController = TextEditingController();
@@ -23,7 +22,6 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
   final _expectedWindowsController = TextEditingController();
   final _notesController = TextEditingController();
 
-  // FocusNodes
   final _nameFocus = FocusNode();
   final _phoneFocus = FocusNode();
   final _locationFocus = FocusNode();
@@ -32,8 +30,6 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
   final _notesFocus = FocusNode();
 
   bool _isSaving = false;
-
-  // Regex for Indian Phone Numbers
   final _phoneRegex = RegExp(r'^(\+91[\-\s]?)?[0-9]{10}$');
 
   @override
@@ -55,28 +51,27 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Theme references for cleaner code
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final scaffoldColor = Theme.of(context).scaffoldBackgroundColor;
-    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: scaffoldColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           'New Enquiry',
-          style: TextStyle(
+          style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w700,
-            color: isDark ? Colors.white : Colors.black,
-            fontSize: 20,
           ),
         ),
         centerTitle: false,
-        backgroundColor: scaffoldColor,
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
-        iconTheme: IconThemeData(color: isDark ? Colors.white : Colors.black),
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, size: 24),
+          icon: Icon(
+            Icons.arrow_back_rounded,
+            color: theme.colorScheme.onSurface,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -85,6 +80,16 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           children: [
+            // ═══════════════════════════════════════════════════════════════
+            // BASIC INFORMATION SECTION
+            // ═══════════════════════════════════════════════════════════════
+            _SectionHeader(
+              icon: AppIconType.customer,
+              title: 'Basic Information',
+              theme: theme,
+            ),
+            const SizedBox(height: 12),
+
             // Name
             TextFormField(
               controller: _nameController,
@@ -92,18 +97,17 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_phoneFocus),
-              style: TextStyle(
+              style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
-                fontSize: 18,
-                color: textColor,
               ),
               decoration: _buildInputDecoration(
+                context,
                 'Customer Name *',
-                Icons.person_outline_rounded,
+                AppIconType.customer,
                 isDark,
               ),
-              validator: (value) =>
-                  value == null || value.isEmpty ? 'Please enter name' : null,
+              validator: (v) =>
+                  v == null || v.isEmpty ? 'Please enter name' : null,
             ),
             const SizedBox(height: 16),
 
@@ -115,22 +119,18 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_locationFocus),
-              style: TextStyle(
+              style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
-                fontSize: 18,
-                color: textColor,
               ),
               decoration: _buildInputDecoration(
+                context,
                 'Phone (Optional)',
-                Icons.phone_outlined,
+                AppIconType.phone,
                 isDark,
               ),
-              validator: (val) {
-                if (val != null && val.isNotEmpty) {
-                  if (!_phoneRegex.hasMatch(val)) {
-                    return 'Enter valid 10-digit number';
-                  }
-                }
+              validator: (v) {
+                if (v != null && v.isNotEmpty && !_phoneRegex.hasMatch(v))
+                  return 'Invalid phone';
                 return null;
               },
             ),
@@ -143,44 +143,29 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_requirementsFocus),
-              style: const TextStyle(
+              style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
-                fontSize: 18,
-                color: Color(0xFF1F2937),
               ),
               decoration: _buildInputDecoration(
+                context,
                 'Location / Area *',
-                Icons.location_on_outlined,
+                AppIconType.location,
                 isDark,
               ),
-              validator: (value) => value == null || value.isEmpty
-                  ? 'Please enter location'
-                  : null,
+              validator: (v) =>
+                  v == null || v.isEmpty ? 'Please enter location' : null,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
 
-            // Location
-            TextFormField(
-              controller: _locationController,
-              focusNode: _locationFocus,
-              textInputAction: TextInputAction.next,
-              onFieldSubmitted: (_) =>
-                  FocusScope.of(context).requestFocus(_requirementsFocus),
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 18,
-                color: textColor,
-              ),
-              decoration: _buildInputDecoration(
-                'Location / Area *',
-                Icons.location_on_outlined,
-                isDark,
-              ),
-              validator: (value) => value == null || value.isEmpty
-                  ? 'Please enter location'
-                  : null,
+            // ═══════════════════════════════════════════════════════════════
+            // PROJECT DETAILS SECTION
+            // ═══════════════════════════════════════════════════════════════
+            _SectionHeader(
+              icon: AppIconType.file,
+              title: 'Project Details',
+              theme: theme,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             // Requirements
             TextFormField(
@@ -190,39 +175,47 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               maxLines: 2,
               onFieldSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_expectedWindowsFocus),
-              style: TextStyle(
+              style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
-                fontSize: 18,
-                color: textColor,
                 height: 1.3,
               ),
               decoration: _buildInputDecoration(
-                'Requirements',
-                Icons.assignment_outlined,
+                context,
+                'Requirements (Optional)',
+                AppIconType.file,
                 isDark,
               ),
             ),
             const SizedBox(height: 16),
 
-            // Expected Windows / Count
+            // Expected Windows
             TextFormField(
               controller: _expectedWindowsController,
               focusNode: _expectedWindowsFocus,
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_notesFocus),
-              style: TextStyle(
+              style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
-                fontSize: 18,
-                color: textColor,
               ),
               decoration: _buildInputDecoration(
+                context,
                 'Expected Windows (Optional)',
-                Icons.grid_view_rounded,
+                AppIconType.window,
                 isDark,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
+
+            // ═══════════════════════════════════════════════════════════════
+            // NOTES SECTION
+            // ═══════════════════════════════════════════════════════════════
+            _SectionHeader(
+              icon: AppIconType.edit,
+              title: 'Additional Notes',
+              theme: theme,
+            ),
+            const SizedBox(height: 12),
 
             // Notes
             TextFormField(
@@ -230,15 +223,14 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
               focusNode: _notesFocus,
               textInputAction: TextInputAction.done,
               maxLines: 3,
-              style: TextStyle(
+              style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
-                fontSize: 18,
-                color: textColor,
                 height: 1.3,
               ),
               decoration: _buildInputDecoration(
-                'Optional Notes',
-                Icons.note_alt_outlined,
+                context,
+                'Notes (Optional)',
+                AppIconType.edit,
                 isDark,
               ),
             ),
@@ -253,7 +245,7 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
             height: 54,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2563EB),
+                backgroundColor: theme.colorScheme.primary,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -285,10 +277,12 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
   }
 
   InputDecoration _buildInputDecoration(
+    BuildContext context,
     String label,
-    IconData icon,
+    AppIconType icon,
     bool isDark,
   ) {
+    final theme = Theme.of(context);
     final borderColor = isDark
         ? const Color(0xFF374151)
         : const Color(0xFFE5E7EB);
@@ -310,20 +304,19 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
         fontSize: 17,
         fontWeight: FontWeight.w400,
       ),
-      floatingLabelStyle: const TextStyle(
-        color: Color(0xFF2563EB),
+      floatingLabelStyle: TextStyle(
+        color: theme.colorScheme.primary,
         fontSize: 15,
         fontWeight: FontWeight.w600,
       ),
       floatingLabelBehavior: FloatingLabelBehavior.auto,
       prefixIcon: Padding(
         padding: const EdgeInsets.only(left: 14, right: 10),
-        child: Icon(icon, color: iconColor, size: 26),
+        child: AppIcon(icon, size: 26, color: iconColor),
       ),
       prefixIconConstraints: const BoxConstraints(minWidth: 50, minHeight: 50),
       filled: true,
       fillColor: fillColor,
-      isCollapsed: false,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -335,7 +328,7 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
+        borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -381,8 +374,41 @@ class _CreateEnquiryScreenState extends State<CreateEnquiryScreen> {
       } catch (e) {
         if (!mounted) return;
         setState(() => _isSaving = false);
-        ToastService.show(context, 'Error creating enquiry: $e', isError: true);
+        ToastService.show(context, 'Error: $e', isError: true);
       }
     }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION HEADER WIDGET
+// ═══════════════════════════════════════════════════════════════════════════
+class _SectionHeader extends StatelessWidget {
+  final AppIconType icon;
+  final String title;
+  final ThemeData theme;
+
+  const _SectionHeader({
+    required this.icon,
+    required this.title,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        AppIcon(icon, size: 20, color: theme.colorScheme.primary),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+            color: theme.colorScheme.primary,
+          ),
+        ),
+      ],
+    );
   }
 }

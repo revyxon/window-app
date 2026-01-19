@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:ui';
 import '../models/customer.dart';
 import '../models/window.dart';
@@ -137,6 +139,7 @@ class ShareBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final shareText = _generateShareText();
 
     return ClipRRect(
@@ -145,9 +148,11 @@ class ShareBottomSheet extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: theme.colorScheme.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+            border: Border.all(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+            ),
           ),
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
           child: Column(
@@ -165,11 +170,7 @@ class ShareBottomSheet extends StatelessWidget {
 
               const Text(
                 'Share Measurement',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 20),
 
@@ -177,18 +178,22 @@ class ShareBottomSheet extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
+                  color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                  border: Border.all(
+                    color: theme.colorScheme.outlineVariant.withValues(
+                      alpha: 0.15,
+                    ),
+                  ),
                 ),
                 constraints: const BoxConstraints(maxHeight: 180),
                 child: SingleChildScrollView(
                   child: Text(
                     shareText,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 11,
-                      color: Color(0xFF374151),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                       height: 1.4,
                     ),
                   ),
@@ -196,69 +201,89 @@ class ShareBottomSheet extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
+              // Action Buttons - 2x2 grid in Enquiry style
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildGlassActionBtn(
-                    icon: Icons.copy_rounded,
-                    label: 'Copy',
-                    iconColor: Colors.blue.shade700,
-                    fillColor: Colors.blue.shade50,
-                    onTap: () {
-                      Clipboard.setData(ClipboardData(text: shareText));
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Copied to clipboard'),
-                            duration: Duration(seconds: 1),
-                          ),
-                        );
-                      }
-                    },
+                  Expanded(
+                    child: _ActionBtn(
+                      icon: Icons.copy_rounded,
+                      label: 'Copy',
+                      color: theme.colorScheme.primary,
+                      onTap: () {
+                        Clipboard.setData(ClipboardData(text: shareText));
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Copied'),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        }
+                      },
+                    ),
                   ),
-                  _buildGlassActionBtn(
-                    icon: Icons.message_rounded,
-                    label: 'WhatsApp',
-                    iconColor: Colors.green.shade600,
-                    fillColor: Colors.green.shade50,
-                    onTap: () => _shareText(context, true),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _ActionBtn(
+                      icon: Icons.message_rounded,
+                      label: 'WhatsApp',
+                      color: const Color(0xFF10B981),
+                      onTap: () => _shareText(context, true),
+                    ),
                   ),
-                  _buildGlassActionBtn(
-                    icon: Icons.share_rounded,
-                    label: 'Share',
-                    iconColor: Colors.blue.shade600,
-                    fillColor: Colors.blue.shade50,
-                    onTap: () => _shareText(context, false),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _ActionBtn(
+                      icon: Icons.share_rounded,
+                      label: 'Share',
+                      color: theme.colorScheme.primary,
+                      onTap: () => _shareText(context, false),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _ActionBtn(
+                      icon: Icons.download_rounded,
+                      label: 'Download TXT',
+                      color: const Color(0xFFF59E0B),
+                      onTap: () => _downloadTxt(context, shareText),
+                    ),
                   ),
                 ],
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              const Text(
+              Text(
                 'Or share as PDF',
-                style: TextStyle(color: Colors.grey, fontSize: 12),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               Row(
                 children: [
                   Expanded(
-                    child: _buildOutlineBtn(
+                    child: _ActionBtn(
                       icon: Icons.straighten_rounded,
-                      label: 'Measurement',
-                      color: Colors.blue.shade700,
+                      label: 'Measurement PDF',
+                      color: theme.colorScheme.primary,
                       onTap: () => _sharePdf(context, false),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: _buildOutlineBtn(
+                    child: _ActionBtn(
                       icon: Icons.receipt_long_rounded,
-                      label: 'Invoice',
-                      color: Colors.blue.shade700,
+                      label: 'Invoice PDF',
+                      color: theme.colorScheme.primary,
                       onTap: () => _sharePdf(context, true),
                     ),
                   ),
@@ -271,68 +296,60 @@ class ShareBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildGlassActionBtn({
-    required IconData icon,
-    required String label,
-    required Color iconColor,
-    required Color fillColor,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 90,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: fillColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: iconColor.withValues(alpha: 0.1)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: iconColor, size: 26),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: iconColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  // Download TXT file
+  Future<void> _downloadTxt(BuildContext context, String text) async {
+    try {
+      final directory = await getExternalStorageDirectory();
+      final fileName = '${customer.name.replaceAll(' ', '_')}_measurement.txt';
+      final file = File('${directory!.path}/$fileName');
+      await file.writeAsString(text);
+      if (context.mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved to $fileName'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 
-  Widget _buildOutlineBtn({
+  Widget _ActionBtn({
     required IconData icon,
     required String label,
     required Color color,
     required VoidCallback onTap,
   }) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          border: Border.all(color: color),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 20),
+            Icon(icon, color: color, size: 18),
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

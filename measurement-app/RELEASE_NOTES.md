@@ -1,24 +1,22 @@
-# ✨ Window App v1.6.0: The Dark Mode Redesign
-**Reliability & Aesthetics Overhaul**
+# What's New in Glaze Pro v1.2.2 🚀
 
-This update brings a massive visual upgrade and critical stability improvements.
+Welcome to a completely reimagined experience. 
 
-## 🎨 Design & Experience
-*   **Premium Dark Mode:** Completely redesigned dark theme with OLED-friendly "True Black" backgrounds and high-contrast text. No more invisible text or washed-out cards.
-*   **Glassmorphism UI:** Cards now feature a subtle, modern glass effect that adapts perfectly to both Light and Dark modes.
-*   **Typography:** Enhanced font hierarchy with *Inter* for better readability.
-*   **Visual Polish:** Improved empty states, smoother transitions, and consistent iconography.
+## ✨ Premium UI Overhaul
+We've redesigned the update experience from the ground up:
+*   **Glassmorphism Effects**: New translucent surfaces that blur appropriately for a modern feel.
+*   **Ambient Particles**: A new dynamic background brings the app to life.
+*   **Fluid Animations**: Smooth transitions and entry animations for every element.
 
-## ⚡ Performance & Stability
-*   **Deep Theme System:** Implemented a centralized theme engine. The app now intelligently switches styling tokens based on system preferences.
-*   **Auto-Update Fixed:** Resolved the "Hidden Update" bug. This version restores the automatic update prompt functionality.
-*   **Memory Optimization:** Reduced memory usage in list views.
+## 🛡️ Robust Cloud Sync
+Your data is safer than ever with our new Pro Sync Engine:
+*   **Automatic Backup**: Your data now securely pushes to the cloud every 5 minutes.
+*   **Smart Restore**: Lost your data? Restore everything instantly with our new interactive Restore flow.
+*   **Smart Refresh**: The app now intelligently updates only what changed, making it faster and smoother.
 
-## 🛠 Fixes
-*   Fixed: Customer names invisible in Dark Mode.
-*   Fixed: Search bar contrast issues.
-*   Fixed: Manual Sync button visibility in Dark Mode.
-*   Fixed: `SystemGuard` update check logic.
+## ⚡ System Enhancements
+*   **Persistent Identity**: Your device is now securely recognized even after re-installations.
+*   **Performance**: Significant optimizations to app startup and data loading.
+*   **Stability**: Fixed potential race conditions for rock-solid reliability.
 
-**Notes for Users:**
-*   If you are on v1.5.2 or earlier, you **must manual update** to this version. Future updates will be automatic.
+*Update now to experience the future of window measurement.*

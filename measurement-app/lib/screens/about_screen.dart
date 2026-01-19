@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../utils/app_colors.dart';
 import '../utils/haptics.dart';
 
@@ -10,109 +11,102 @@ class AboutScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          _buildSliverAppBar(context),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 60),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // GROUP 1: Identity
-                _buildHeaderIdentity(),
-                const SizedBox(height: 40),
+      body: FutureBuilder<PackageInfo>(
+        future: PackageInfo.fromPlatform(),
+        builder: (context, snapshot) {
+          final version = snapshot.hasData
+              ? 'v${snapshot.data!.version} (Build ${snapshot.data!.buildNumber})'
+              : 'Checking version...';
 
-                // GROUP 2: The Core (Real Features)
-                _buildSectionLabel('THE CORE ENGINE'),
-                _buildFeatureTile(
-                  'Quick-Entry System',
-                  'Rapid "W x H" input with number pad optimized for speed.',
-                  FluentIcons.keyboard_layout_float_24_regular,
-                  Colors.blue,
+          return CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              _buildSliverAppBar(context),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 60),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    // GROUP 1: Identity
+                    _buildHeaderIdentity(version),
+                    const SizedBox(height: 40),
+
+                    // GROUP 2: The Core (Real Features)
+                    _buildSectionLabel('THE CORE ENGINE'),
+                    _buildFeatureTile(
+                      'Quick-Entry System',
+                      'Rapid "W x H" input with number pad optimized for speed.',
+                      FluentIcons.keyboard_layout_float_24_regular,
+                      Colors.blue,
+                    ),
+                    _buildFeatureTile(
+                      'Window Type System',
+                      'Native support for 3T, 2T, Open, Fixed, Partition & custom types.',
+                      FluentIcons.grid_24_regular,
+                      Colors.indigo,
+                    ),
+                    _buildFeatureTile(
+                      'Smart "Hold" Logic',
+                      'Pause specific windows to exclude them from calculations without deleting.',
+                      FluentIcons.pause_circle_24_regular,
+                      Colors.orange,
+                    ),
+                    _buildFeatureTile(
+                      'Final Measurement Mode',
+                      'Lock customer profiles with "Final" status to prevent accidental edits.',
+                      FluentIcons.checkmark_lock_24_regular,
+                      Colors.green,
+                    ),
+                    _buildFeatureTile(
+                      'Global Search',
+                      'Instantly find customers by name, location, or phone.',
+                      FluentIcons.search_24_regular,
+                      Colors.teal,
+                    ),
+                    const SizedBox(height: 32),
+
+                    // GROUP 3: Admin Intelligence
+                    _buildSectionLabel('ADMIN INTELLIGENCE'),
+                    _buildAdminInsightsCard(),
+                    const SizedBox(height: 32),
+
+                    // GROUP 4: Cloud & Data
+                    _buildSectionLabel('CLOUD & ARCHITECTURE'),
+                    _buildCloudGrid(),
+                    const SizedBox(height: 32),
+
+                    // GROUP 5: Workflow
+                    _buildSectionLabel('WORKFLOW GUIDE'),
+                    _buildWorkflowSteps(),
+                    const SizedBox(height: 32),
+
+                    // GROUP 6: Tech Stack
+                    _buildSectionLabel('POWERED BY'),
+                    _buildTechStackGrid(),
+                    const SizedBox(height: 32),
+
+                    // GROUP 7: Legal/Footer
+                    _buildLinkRow(
+                      'Privacy Policy',
+                      FluentIcons.shield_24_regular,
+                    ),
+                    _buildLinkRow(
+                      'Terms of Use',
+                      FluentIcons.document_text_24_regular,
+                    ),
+                    const SizedBox(height: 40),
+
+                    _buildFooter(),
+                  ]),
                 ),
-                _buildFeatureTile(
-                  'Window Type System',
-                  'Native support for 3T, 2T, Open, Fixed, Partition & custom types.',
-                  FluentIcons.grid_24_regular,
-                  Colors.indigo,
-                ),
-                _buildFeatureTile(
-                  'Smart "Hold" Logic',
-                  'Pause specific windows to exclude them from calculations without deleting.',
-                  FluentIcons.pause_circle_24_regular,
-                  Colors.orange,
-                ),
-                _buildFeatureTile(
-                  'Final Measurement Mode',
-                  'Lock customer profiles with "Final" status to prevent accidental edits.',
-                  FluentIcons.checkmark_lock_24_regular,
-                  Colors.green,
-                ),
-                _buildFeatureTile(
-                  'Global Search',
-                  'Instantly find customers by name, location, or phone.',
-                  FluentIcons.search_24_regular,
-                  Colors.teal,
-                ),
-                const SizedBox(height: 32),
-
-                // GROUP 3: Admin Intelligence
-                _buildSectionLabel('ADMIN INTELLIGENCE'),
-                _buildAdminInsightsCard(),
-                const SizedBox(height: 32),
-
-                // GROUP 4: Cloud & Data
-                _buildSectionLabel('CLOUD & ARCHITECTURE'),
-                _buildCloudGrid(),
-                const SizedBox(height: 32),
-
-                // GROUP 5: Workflow
-                _buildSectionLabel('WORKFLOW GUIDE'),
-                _buildWorkflowSteps(),
-                const SizedBox(height: 32),
-
-                // GROUP 6: Tech Stack
-                _buildSectionLabel('POWERED BY'),
-                _buildTechStackGrid(),
-                const SizedBox(height: 32),
-
-                // GROUP 7: Legal/Footer
-                _buildLinkRow('Privacy Policy', FluentIcons.shield_24_regular),
-                _buildLinkRow(
-                  'Terms of Use',
-                  FluentIcons.document_text_24_regular,
-                ),
-                const SizedBox(height: 40),
-
-                _buildFooter(),
-              ]),
-            ),
-          ),
-        ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildSliverAppBar(BuildContext context) {
-    return SliverAppBar(
-      expandedHeight: 0,
-      floating: true,
-      pinned: true,
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      elevation: 0,
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Colors.black),
-        onPressed: () => Navigator.pop(context),
-      ),
-      title: const Text(
-        'About',
-        style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-
-  Widget _buildHeaderIdentity() {
+  Widget _buildHeaderIdentity(String versionString) {
     return Column(
       children: [
         Hero(
@@ -165,6 +159,22 @@ class AboutScreen extends StatelessWidget {
             fontWeight: FontWeight.w500,
           ),
         ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.blue.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            versionString,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.blue,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
         const SizedBox(height: 24),
 
         // Developer Credit Pill
@@ -192,6 +202,25 @@ class AboutScreen extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildSliverAppBar(BuildContext context) {
+    return SliverAppBar(
+      expandedHeight: 0,
+      floating: true,
+      pinned: true,
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Colors.black),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: const Text(
+        'About',
+        style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+      ),
     );
   }
 

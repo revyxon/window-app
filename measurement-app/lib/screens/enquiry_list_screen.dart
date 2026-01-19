@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 // import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import '../providers/app_provider.dart';
-import '../utils/app_colors.dart';
 import '../widgets/enquiry_card.dart';
 import 'enquiry_detail_screen.dart';
+import '../ui/components/app_header.dart';
+import '../ui/components/app_icon.dart';
+import '../ui/components/app_search_bar.dart';
+import '../ui/dialogs/restore_dialog.dart';
 import '../utils/fast_page_route.dart';
 
 class EnquiryListScreen extends StatefulWidget {
@@ -37,40 +40,12 @@ class _EnquiryListScreenState extends State<EnquiryListScreen> {
     super.dispose();
   }
 
-  Widget _buildFilterChip(String label, String value) {
-    final isSelected = _activeFilter == value;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _activeFilter = value;
-        });
-      },
-      child: Container(
-        margin: const EdgeInsets.only(right: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : Colors.grey.shade300,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black87,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-            fontSize: 14,
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Consumer<AppProvider>(
         builder: (context, provider, child) {
           final enquiries = provider.enquiries.where((e) {
@@ -90,66 +65,27 @@ class _EnquiryListScreenState extends State<EnquiryListScreen> {
             return e.status.toLowerCase() == _activeFilter;
           }).toList();
 
-          return CustomScrollView(
-            slivers: [
-              SliverAppBar(
-                floating: false,
-                pinned: true,
-                elevation: 0,
-                backgroundColor: Colors.white,
-                surfaceTintColor: Colors.transparent,
-                toolbarHeight: 60,
-                title: Row(
-                  children: [
-                    const Icon(Icons.assignment_outlined, color: Colors.black),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Enquiries',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 24,
-                      ),
-                    ),
-                  ],
-                ),
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(120),
+          return NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) => [
+              const AppHeader(title: 'Enquiries', icon: AppIconType.enquiry),
+              // Search and Filter placed below header in a non-sticky sliver for now
+              // Or we can make them part of the body
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   child: Column(
                     children: [
                       // Search
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: TextField(
-                            controller: _searchController,
-                            onChanged: (value) =>
-                                setState(() => _searchQuery = value),
-                            style: const TextStyle(fontSize: 16),
-                            decoration: InputDecoration(
-                              hintText: 'Search enquiries...',
-                              hintStyle: TextStyle(color: Colors.grey.shade500),
-                              prefixIcon: Icon(
-                                Icons.search_rounded,
-                                color: Colors.grey.shade500,
-                              ),
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
-                            ),
-                          ),
-                        ),
+                      AppSearchBar(
+                        controller: _searchController,
+                        onChanged: (value) =>
+                            setState(() => _searchQuery = value),
+                        hintText: 'Search enquiries...',
                       ),
+                      const SizedBox(height: 12),
                       // Filter Chips
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                         child: Row(
                           children: [
                             _buildFilterChip('All', 'all'),
@@ -163,21 +99,20 @@ class _EnquiryListScreenState extends State<EnquiryListScreen> {
                   ),
                 ),
               ),
-
-              if (provider.isLoading)
-                const SliverFillRemaining(
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (enquiries.isEmpty)
-                SliverFillRemaining(
-                  child: Center(
+            ],
+            body: provider.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : enquiries.isEmpty
+                ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
                           Icons.assignment_outlined,
                           size: 48,
-                          color: Colors.grey.shade300,
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.2,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         Text(
@@ -185,37 +120,94 @@ class _EnquiryListScreenState extends State<EnquiryListScreen> {
                               ? 'No enquiries yet'
                               : 'No enquiries found',
                           style: TextStyle(
-                            color: Colors.grey.shade500,
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.5,
+                            ),
                             fontSize: 16,
                           ),
                         ),
+                        // Restore Button for Empty State
+                        if (_searchQuery.isEmpty && _activeFilter == 'all') ...[
+                          const SizedBox(height: 24),
+                          TextButton.icon(
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => const RestoreDialog(),
+                              );
+                            },
+                            icon: const Icon(Icons.cloud_download_rounded),
+                            label: const Text('Restore from Cloud'),
+                          ),
+                        ],
                       ],
                     ),
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.all(16),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate((context, index) {
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                    itemCount: enquiries.length,
+                    itemBuilder: (context, index) {
                       final enquiry = enquiries[index];
-                      return EnquiryCard(
-                        enquiry: enquiry,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            FastPageRoute(
-                              page: EnquiryDetailScreen(enquiry: enquiry),
-                            ),
-                          );
-                        },
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: EnquiryCard(
+                          enquiry: enquiry,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              FastPageRoute(
+                                page: EnquiryDetailScreen(enquiry: enquiry),
+                              ),
+                            );
+                          },
+                        ),
                       );
-                    }, childCount: enquiries.length),
+                    },
                   ),
-                ),
-            ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, String value) {
+    final theme = Theme.of(context);
+    final isSelected = _activeFilter == value;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _activeFilter = value;
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? theme.colorScheme.primary
+                : isDark
+                ? Colors.white.withValues(alpha: 0.1)
+                : theme.colorScheme.outline.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected
+                ? theme.colorScheme.onPrimary
+                : theme.colorScheme.onSurface,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            fontSize: 14,
+          ),
+        ),
       ),
     );
   }

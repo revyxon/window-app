@@ -5,10 +5,10 @@ import '../providers/app_provider.dart';
 import '../utils/fast_page_route.dart';
 import '../widgets/premium_toast.dart';
 import '../utils/constant_data.dart';
+import '../ui/components/app_icon.dart';
 import 'window_input_screen.dart';
 
 class AddCustomerScreen extends StatefulWidget {
-  /// Pass a customer to edit, or null to create new
   final Customer? customerToEdit;
 
   const AddCustomerScreen({super.key, this.customerToEdit});
@@ -20,14 +20,12 @@ class AddCustomerScreen extends StatefulWidget {
 class _AddCustomerScreenState extends State<AddCustomerScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers
   final _nameController = TextEditingController();
   final _locationController = TextEditingController();
   final _phoneController = TextEditingController();
   final _rateController = TextEditingController();
   final _customGlassController = TextEditingController();
 
-  // FocusNodes for Enter key navigation
   final _nameFocus = FocusNode();
   final _locationFocus = FocusNode();
   final _phoneFocus = FocusNode();
@@ -37,30 +35,25 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
   String? _selectedGlassType;
   bool _isFinalMeasurement = false;
 
-  // Regex for Indian Phone Numbers (10 digits, optional +91)
-  final _phoneRegex = RegExp(r'^(\+91[\-\s]?)?[0-9]{10}$');
-
   bool get _isEditMode => widget.customerToEdit != null;
+  final _phoneRegex = RegExp(r'^(\+91[\-\s]?)?[0-9]{10}$');
 
   @override
   void initState() {
     super.initState();
-    // Pre-fill fields if editing
     if (_isEditMode) {
       final c = widget.customerToEdit!;
       _nameController.text = c.name;
       _locationController.text = c.location;
       _phoneController.text = c.phone ?? '';
-      _rateController.text = c.ratePerSqft?.toString() ?? '';
       _selectedFramework = c.framework;
+      _selectedGlassType = c.glassType;
+      _rateController.text = c.ratePerSqft?.toString() ?? '';
       _isFinalMeasurement = c.isFinalMeasurement;
-      // Handle glass type - check if it's a custom value
       if (c.glassType != null &&
           !ConstantData.glassTypes.contains(c.glassType)) {
         _selectedGlassType = 'Other';
         _customGlassController.text = c.glassType!;
-      } else {
-        _selectedGlassType = c.glassType;
       }
     }
   }
@@ -81,27 +74,27 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black;
-    final inputTextColor = isDark ? Colors.white : const Color(0xFF1F2937);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           _isEditMode ? 'Edit Customer' : 'New Customer',
-          style: TextStyle(
+          style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w700,
-            color: textColor,
-            fontSize: 20,
           ),
         ),
         centerTitle: false,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: theme.scaffoldBackgroundColor,
         elevation: 0,
-        iconTheme: IconThemeData(color: textColor),
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, size: 24),
+          icon: Icon(
+            Icons.arrow_back_rounded,
+            color: theme.colorScheme.onSurface,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -110,50 +103,57 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           children: [
-            // Customer Name - NO SizedBox to prevent shrinking on error
+            // ═══════════════════════════════════════════════════════════════
+            // BASIC INFORMATION SECTION
+            // ═══════════════════════════════════════════════════════════════
+            _SectionHeader(
+              icon: AppIconType.customer,
+              title: 'Basic Information',
+              theme: theme,
+            ),
+            const SizedBox(height: 12),
+
+            // Customer Name
             TextFormField(
               controller: _nameController,
               focusNode: _nameFocus,
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_locationFocus),
-              style: TextStyle(
+              style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
-                fontSize: 18,
-                color: inputTextColor,
               ),
               decoration: _buildInputDecoration(
                 context,
                 'Customer Name *',
-                Icons.person_outline_rounded,
+                AppIconType.customer,
               ),
-              validator: (value) =>
-                  value == null || value.isEmpty ? 'Please enter name' : null,
+              validator: (v) =>
+                  v == null || v.isEmpty ? 'Please enter name' : null,
             ),
             const SizedBox(height: 16),
 
+            // Location
             TextFormField(
               controller: _locationController,
               focusNode: _locationFocus,
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_phoneFocus),
-              style: TextStyle(
+              style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
-                fontSize: 18,
-                color: inputTextColor,
               ),
               decoration: _buildInputDecoration(
                 context,
                 'Location *',
-                Icons.location_on_outlined,
+                AppIconType.location,
               ),
-              validator: (value) => value == null || value.isEmpty
-                  ? 'Please enter location'
-                  : null,
+              validator: (v) =>
+                  v == null || v.isEmpty ? 'Please enter location' : null,
             ),
             const SizedBox(height: 16),
 
+            // Phone
             TextFormField(
               controller: _phoneController,
               focusNode: _phoneFocus,
@@ -161,29 +161,25 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) =>
                   FocusScope.of(context).requestFocus(_rateFocus),
-              style: TextStyle(
+              style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
-                fontSize: 18,
-                color: inputTextColor,
               ),
               decoration: _buildInputDecoration(
                 context,
                 'Phone (Optional)',
-                Icons.phone_outlined,
+                AppIconType.phone,
               ),
-              validator: (val) {
-                if (val != null && val.isNotEmpty) {
-                  // Only validate if user entered something
-                  if (!_phoneRegex.hasMatch(val)) {
-                    return 'Enter valid 10-digit number';
-                  }
-                }
+              validator: (v) {
+                if (v != null && v.isNotEmpty && !_phoneRegex.hasMatch(v))
+                  return 'Invalid phone';
                 return null;
               },
             ),
             const SizedBox(height: 24),
 
-            // Framework Section
+            // ═══════════════════════════════════════════════════════════════
+            // FRAMEWORK SECTION (ORIGINAL STYLE)
+            // ═══════════════════════════════════════════════════════════════
             const Text(
               'Framework',
               style: TextStyle(
@@ -207,6 +203,17 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
             ),
             const SizedBox(height: 24),
 
+            // ═══════════════════════════════════════════════════════════════
+            // GLASS & PRICING SECTION
+            // ═══════════════════════════════════════════════════════════════
+            _SectionHeader(
+              icon: AppIconType.sparkle,
+              title: 'Glass & Pricing',
+              theme: theme,
+            ),
+            const SizedBox(height: 12),
+
+            // Glass Type Dropdown
             DropdownButtonFormField<String>(
               initialValue: _selectedGlassType,
               icon: Icon(
@@ -214,62 +221,58 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                 color: isDark ? Colors.grey.shade400 : const Color(0xFF6B7280),
                 size: 26,
               ),
-              style: TextStyle(
+              style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
-                color: inputTextColor,
-                fontSize: 18,
               ),
               decoration: _buildInputDecoration(
                 context,
                 'Glass Type (Optional)',
-                Icons.layers_outlined,
+                AppIconType.sparkle,
               ),
-              items: [...ConstantData.glassTypes, 'Other'].map((type) {
-                return DropdownMenuItem(value: type, child: Text(type));
-              }).toList(),
-              onChanged: (value) => setState(() => _selectedGlassType = value),
+              items: [
+                ...ConstantData.glassTypes,
+                'Other',
+              ].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+              onChanged: (v) => setState(() => _selectedGlassType = v),
             ),
 
-            if (_selectedGlassType == 'Other')
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: TextFormField(
-                  controller: _customGlassController,
-                  textInputAction: TextInputAction.next,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 18,
-                    color: inputTextColor,
-                  ),
-                  decoration: _buildInputDecoration(
-                    context,
-                    'Enter Custom Glass Type',
-                    Icons.edit_outlined,
-                  ),
+            if (_selectedGlassType == 'Other') ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _customGlassController,
+                textInputAction: TextInputAction.next,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+                decoration: _buildInputDecoration(
+                  context,
+                  'Custom Glass Type',
+                  AppIconType.edit,
                 ),
               ),
-
+            ],
             const SizedBox(height: 16),
 
+            // Rate
             TextFormField(
               controller: _rateController,
               focusNode: _rateFocus,
               keyboardType: TextInputType.number,
               textInputAction: TextInputAction.done,
-              style: TextStyle(
+              style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w500,
-                fontSize: 18,
-                color: inputTextColor,
               ),
               decoration: _buildInputDecoration(
                 context,
                 'Rate per Sq.Ft (Optional)',
-                Icons.currency_rupee_rounded,
+                AppIconType.calculator,
               ),
             ),
             const SizedBox(height: 24),
 
-            // Final Measurement Card
+            // ═══════════════════════════════════════════════════════════════
+            // FINAL MEASUREMENT CARD (ORIGINAL STYLE)
+            // ═══════════════════════════════════════════════════════════════
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
@@ -308,14 +311,13 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                     child: Switch(
                       value: _isFinalMeasurement,
                       activeThumbColor: Colors.white,
-                      activeTrackColor: const Color(0xFF2563EB),
+                      activeTrackColor: theme.colorScheme.primary,
                       inactiveThumbColor: Colors.white,
-                      inactiveTrackColor: const Color(0xFFD1D5DB),
+                      inactiveTrackColor: theme.colorScheme.outlineVariant,
                       trackOutlineColor: WidgetStateProperty.all(
                         Colors.transparent,
                       ),
-                      onChanged: (val) =>
-                          setState(() => _isFinalMeasurement = val),
+                      onChanged: (v) => setState(() => _isFinalMeasurement = v),
                     ),
                   ),
                 ],
@@ -332,7 +334,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
             height: 54,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2563EB),
+                backgroundColor: theme.colorScheme.primary,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -340,11 +342,50 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                 ),
               ),
               onPressed: _saveCustomer,
-              child: const Text(
-                'Next → Add Windows',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+              child: Text(
+                _isEditMode ? 'Save Changes' : 'Next → Add Windows',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFrameworkButton(BuildContext context, String label) {
+    final isSelected = _selectedFramework == label;
+    final theme = Theme.of(context);
+
+    return GestureDetector(
+      onTap: () => setState(() => _selectedFramework = label),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.colorScheme.primary.withValues(alpha: 0.08)
+              : theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outlineVariant,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurface,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 15,
           ),
         ),
       ),
@@ -354,41 +395,44 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
   InputDecoration _buildInputDecoration(
     BuildContext context,
     String label,
-    IconData icon,
+    AppIconType icon,
   ) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final labelColor = isDark ? Colors.grey.shade400 : const Color(0xFF6B7280);
-    final iconColor = isDark ? Colors.grey.shade400 : const Color(0xFF374151);
-    final fillColor = isDark
-        ? const Color(0xFF2C2C2E)
-        : const Color(0xFFF9FAFB);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final borderColor = isDark
-        ? const Color(0xFF3A3A3C)
+        ? const Color(0xFF374151)
         : const Color(0xFFE5E7EB);
-    final floatingLabelBg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+    final fillColor = isDark
+        ? const Color(0xFF1F2937)
+        : const Color(0xFFF9FAFB);
+    final hintColor = isDark
+        ? const Color(0xFF9CA3AF)
+        : const Color(0xFF6B7280);
+    final iconColor = isDark
+        ? const Color(0xFFD1D5DB)
+        : const Color(0xFF374151);
 
     return InputDecoration(
       labelText: label,
+      alignLabelWithHint: true,
       labelStyle: TextStyle(
-        color: labelColor,
+        color: hintColor,
         fontSize: 17,
         fontWeight: FontWeight.w400,
       ),
       floatingLabelStyle: TextStyle(
-        color: const Color(0xFF2563EB),
+        color: theme.colorScheme.primary,
         fontSize: 15,
         fontWeight: FontWeight.w600,
-        backgroundColor: floatingLabelBg,
       ),
       floatingLabelBehavior: FloatingLabelBehavior.auto,
       prefixIcon: Padding(
         padding: const EdgeInsets.only(left: 14, right: 10),
-        child: Icon(icon, color: iconColor, size: 26),
+        child: AppIcon(icon, size: 26, color: iconColor),
       ),
       prefixIconConstraints: const BoxConstraints(minWidth: 50, minHeight: 50),
       filled: true,
       fillColor: fillColor,
-      isCollapsed: false,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -400,7 +444,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
+        borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -414,121 +458,88 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
     );
   }
 
-  Widget _buildFrameworkButton(BuildContext context, String label) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isSelected = _selectedFramework == label;
-    final unselectedBg = isDark ? const Color(0xFF2C2C2E) : Colors.white;
-    final unselectedBorder = isDark
-        ? const Color(0xFF3A3A3C)
-        : const Color(0xFFE5E7EB);
-    final unselectedText = isDark ? Colors.white70 : const Color(0xFF374151);
-
-    return GestureDetector(
-      onTap: () => setState(() => _selectedFramework = label),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeInOut,
-        height: 48,
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF2563EB) : unselectedBg,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF2563EB) : unselectedBorder,
-            width: 1.5,
-          ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF2563EB).withAlpha(64),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : [],
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : unselectedText,
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _saveCustomer() async {
-    if (_formKey.currentState!.validate()) {
-      final provider = Provider.of<AppProvider>(context, listen: false);
+    if (!_formKey.currentState!.validate()) return;
 
-      if (_isEditMode) {
-        // UPDATE existing customer
-        final updated = widget.customerToEdit!.copyWith(
-          name: _nameController.text.trim(),
-          location: _locationController.text.trim(),
-          phone: _phoneController.text.trim().isEmpty
-              ? null
-              : _phoneController.text.trim(),
-          framework: _selectedFramework,
-          glassType: _selectedGlassType == 'Other'
-              ? _customGlassController.text.trim()
-              : _selectedGlassType,
-          ratePerSqft: _rateController.text.trim().isEmpty
-              ? null
-              : double.tryParse(_rateController.text.trim()),
-          isFinalMeasurement: _isFinalMeasurement,
-          updatedAt: DateTime.now(),
-        );
+    final glassType = _selectedGlassType == 'Other'
+        ? _customGlassController.text.trim()
+        : _selectedGlassType;
+    final rate = double.tryParse(_rateController.text.trim());
 
-        try {
-          await provider.updateCustomer(updated);
-          if (!mounted) return;
-          ToastService.show(context, 'Customer updated successfully');
-          Navigator.pop(context, updated); // Return updated customer
-        } catch (e) {
-          ToastService.show(
-            context,
-            'Error updating customer: $e',
-            isError: true,
-          );
-        }
-      } else {
-        // CREATE new customer
-        final customer = Customer(
-          name: _nameController.text.trim(),
-          location: _locationController.text.trim(),
-          phone: _phoneController.text.trim().isEmpty
-              ? null
-              : _phoneController.text.trim(),
-          framework: _selectedFramework,
-          glassType: _selectedGlassType == 'Other'
-              ? _customGlassController.text.trim()
-              : _selectedGlassType,
-          ratePerSqft: _rateController.text.trim().isEmpty
-              ? null
-              : double.tryParse(_rateController.text.trim()),
-          isFinalMeasurement: _isFinalMeasurement,
-          createdAt: DateTime.now(),
-        );
-
-        try {
-          final savedCustomer = await provider.addCustomer(customer);
-          if (!mounted) return;
-
-          Navigator.push(
-            context,
-            FastPageRoute(page: WindowInputScreen(customer: savedCustomer)),
-          );
-        } catch (e) {
-          ToastService.show(
-            context,
-            'Error saving customer: $e',
-            isError: true,
-          );
-        }
-      }
+    if (_isEditMode) {
+      final updated = widget.customerToEdit!.copyWith(
+        name: _nameController.text.trim(),
+        location: _locationController.text.trim(),
+        phone: _phoneController.text.trim().isEmpty
+            ? null
+            : _phoneController.text.trim(),
+        framework: _selectedFramework,
+        glassType: glassType,
+        ratePerSqft: rate,
+        isFinalMeasurement: _isFinalMeasurement,
+      );
+      await Provider.of<AppProvider>(
+        context,
+        listen: false,
+      ).updateCustomer(updated);
+      if (!mounted) return;
+      Navigator.pop(context, updated);
+      ToastService.show(context, 'Customer updated!');
+    } else {
+      final customer = Customer(
+        name: _nameController.text.trim(),
+        location: _locationController.text.trim(),
+        phone: _phoneController.text.trim().isEmpty
+            ? null
+            : _phoneController.text.trim(),
+        framework: _selectedFramework,
+        glassType: glassType,
+        ratePerSqft: rate,
+        isFinalMeasurement: _isFinalMeasurement,
+        createdAt: DateTime.now(),
+      );
+      final saved = await Provider.of<AppProvider>(
+        context,
+        listen: false,
+      ).addCustomer(customer);
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        FastPageRoute(page: WindowInputScreen(customer: saved)),
+      );
     }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SECTION HEADER WIDGET
+// ═══════════════════════════════════════════════════════════════════════════
+class _SectionHeader extends StatelessWidget {
+  final AppIconType icon;
+  final String title;
+  final ThemeData theme;
+
+  const _SectionHeader({
+    required this.icon,
+    required this.title,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        AppIcon(icon, size: 20, color: theme.colorScheme.primary),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+            color: theme.colorScheme.primary,
+          ),
+        ),
+      ],
+    );
   }
 }

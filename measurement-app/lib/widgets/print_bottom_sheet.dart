@@ -37,12 +37,14 @@ class PrintBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
         child: Column(
@@ -54,7 +56,7 @@ class PrintBottomSheet extends StatelessWidget {
               height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: theme.colorScheme.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -65,16 +67,14 @@ class PrintBottomSheet extends StatelessWidget {
               children: [
                 Icon(
                   FluentIcons.print_24_regular,
-                  color: Colors.blue.shade600,
+                  color: theme.colorScheme.primary,
                   size: 24,
                 ),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'Print Document',
-                  style: TextStyle(
-                    fontSize: 18,
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
                   ),
                 ),
               ],
@@ -84,12 +84,11 @@ class PrintBottomSheet extends StatelessWidget {
             // Measurement Card
             _buildOptionCard(
               context,
+              theme,
               icon: FluentIcons.ruler_24_filled,
-              iconBgColor: Colors.blue.shade50,
-              iconColor: Colors.blue.shade600,
               title: 'Measurement Details',
               subtitle: 'Window dimensions and area',
-              onTap: () => _print(context, false), // Measurement
+              onTap: () => _print(context, false),
             ),
 
             const SizedBox(height: 16),
@@ -97,12 +96,11 @@ class PrintBottomSheet extends StatelessWidget {
             // Invoice Card
             _buildOptionCard(
               context,
+              theme,
               icon: FluentIcons.receipt_24_filled,
-              iconBgColor: Colors.blue.shade50,
-              iconColor: Colors.blue.shade600,
               title: 'Proforma Invoice',
               subtitle: 'Professional invoice with bank details',
-              onTap: () => _print(context, true), // Invoice
+              onTap: () => _print(context, true),
             ),
 
             const SizedBox(height: 10),
@@ -113,10 +111,9 @@ class PrintBottomSheet extends StatelessWidget {
   }
 
   Widget _buildOptionCard(
-    BuildContext context, {
+    BuildContext context,
+    ThemeData theme, {
     required IconData icon,
-    required Color iconBgColor,
-    required Color iconColor,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
@@ -127,7 +124,9 @@ class PrintBottomSheet extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade200),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.15),
+          ),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -135,10 +134,10 @@ class PrintBottomSheet extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: iconBgColor,
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: iconColor, size: 24),
+              child: Icon(icon, color: theme.colorScheme.primary, size: 24),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -147,21 +146,24 @@ class PrintBottomSheet extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      fontSize: 15,
+                    style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.grey.shade400),
+            Icon(
+              Icons.chevron_right,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+            ),
           ],
         ),
       ),

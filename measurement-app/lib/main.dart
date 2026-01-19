@@ -8,7 +8,7 @@ import 'services/app_logger.dart';
 import 'services/device_id_service.dart';
 
 import 'services/license_service.dart';
-import 'utils/theme.dart';
+import 'ui/app_theme.dart';
 import 'screens/main_screen.dart';
 import 'widgets/system_guard.dart';
 import 'utils/logging_navigator_observer.dart';
@@ -26,18 +26,17 @@ void main() async {
   await AppLogger().info('MAIN', 'App starting...', 'deviceId=$deviceId');
   await Firebase.initializeApp();
 
-  // Initialize background services (LogService is lazy-loaded)
-  SyncService().initialize();
+  // Initialize background services (Awaited to ensure registration)
+  await SyncService().initialize();
 
-  // Initialize License Service (loads cache, checks background)
-  LicenseService().initialize();
+  // Initialize License Service
+  await LicenseService().initialize();
 
   // Load settings
   final settingsProvider = SettingsProvider();
   await settingsProvider.loadSettings();
 
   // Initialize Shared Intent Listener
-  // Listen to media share while the app is starting or is in memory
   ReceiveSharingIntent.instance.getMediaStream().listen(
     (List<SharedMediaFile> value) {
       if (value.isNotEmpty) {
@@ -62,10 +61,6 @@ void main() async {
 }
 
 void _handleImportFile(String path) {
-  // We need a context to show dialogs, but main() doesn't have one.
-  // We'll store this path in a global key or service to check after app launch
-  // For now, let's use a simple global variable or passing it to MyApp
-  // A better approach is to use a valid navigator key.
   GlobalParams.importFilePath = path;
 }
 
@@ -88,14 +83,16 @@ class MyApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             navigatorKey: GlobalParams.navigatorKey,
             navigatorObservers: [LoggingNavigatorObserver()],
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
+            // Use dynamic theme with accent color and font settings
+            theme: AppTheme.lightTheme(settings),
+            darkTheme: AppTheme.darkTheme(settings),
             themeMode: settings.themeMode,
             builder: (context, child) {
+              final fontMultiplier = settings.fontSizeMultiplier;
               return MediaQuery(
                 data: MediaQuery.of(
                   context,
-                ).copyWith(textScaler: TextScaler.linear(settings.textScale)),
+                ).copyWith(textScaler: TextScaler.linear(fontMultiplier)),
                 child: SystemGuard(child: child!),
               );
             },
